@@ -85,6 +85,28 @@ export default function UploadsPage() {
     setLoading(false);
   };
 
+  const handleProcess = async (uploadId: string) => {
+    if (!confirm("Deseja iniciar o processamento desta planilha? Isso pode levar alguns segundos.")) return;
+    
+    try {
+      const res = await fetch(`http://localhost:8000/process/${uploadId}`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      
+      if (res.ok) {
+        alert(`Sucesso! ${data.linhas_processadas} linhas extraídas e limpas.`);
+      } else {
+        alert(`Erro no servidor: ${data.detail}`);
+      }
+    } catch (error) {
+      alert("Erro fatal de conexão. O seu terminal do Python (porta 8000) está rodando?");
+    } finally {
+      // Independentemente se deu certo ou errado, recarrega a tabela para atualizar os status
+      fetchUploads();
+    }
+  };
+
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -244,13 +266,14 @@ export default function UploadsPage() {
                     <th className="p-4 font-medium text-sm text-gray-600">Cidade</th>
                     <th className="p-4 font-medium text-sm text-gray-600">Categoria</th>
                     <th className="p-4 font-medium text-sm text-gray-600">Status</th>
+                    <th className="p-4 font-medium text-sm text-gray-600">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {uploads.map((up) => (
                     <tr key={up.id} className="border-b hover:bg-gray-50">
                       <td className="p-4 text-sm text-gray-600 whitespace-nowrap">
-                        {new Date(up.created_at).toLocaleDateString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(up.created_at).toLocaleString('pt-BR')}
                       </td>
                       <td className="p-4 text-sm text-gray-800 font-medium truncate max-w-xs" title={up.file_name}>
                         {up.file_name}
@@ -263,10 +286,21 @@ export default function UploadsPage() {
                       </td>
                       <td className="p-4 text-sm whitespace-nowrap">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          up.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
+                          up.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                          up.status === 'processed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                         }`}>
-                          {up.status === 'pending' ? 'Aguardando Tratamento' : up.status}
+                          {up.status === 'pending' ? 'Aguardando' : up.status === 'processed' ? 'Processado' : 'Erro'}
                         </span>
+                      </td>
+                      <td className="p-4 text-sm whitespace-nowrap">
+                        {up.status === 'pending' && (
+                          <button
+                            onClick={() => handleProcess(up.id)}
+                            className="px-3 py-1 bg-slate-800 text-white rounded hover:bg-slate-700 transition shadow-sm"
+                          >
+                            Processar
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
