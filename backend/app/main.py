@@ -2,6 +2,9 @@ import os
 import io
 import json
 import re
+import time
+
+import google.generativeai as genai
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,6 +12,7 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 
 load_dotenv()
+
 app = FastAPI(title="Fiscaliza.AI Backend - Etapa 4.5 Definitiva")
 
 app.add_middleware(
@@ -20,6 +24,11 @@ app.add_middleware(
 )
 
 supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 # ==========================================================
 # 1. SMART PARSER ROBUSTO
@@ -48,16 +57,16 @@ def smart_read_csv(file_bytes):
             try:
                 test_buffer = io.StringIO(decoded)
                 df = pd.read_csv(test_buffer, sep=sep, on_bad_lines="skip")
-                
+
                 # Limpeza extrema: dropa colunas e linhas que são 100% lixo/vazias
                 df = df.dropna(how="all", axis=1).dropna(how="all", axis=0)
 
                 num_cols = len(df.columns)
                 num_rows = len(df)
 
-                # Pontuação: Valoriza mais colunas e linhas válidas
+                # Pontuação: valoriza mais colunas e linhas válidas
                 score = (num_cols * 1000) + num_rows
-                
+
                 # Punição severa se o Pandas engoliu tudo numa coluna só
                 if num_cols == 1:
                     score -= 10000
@@ -72,11 +81,17 @@ def smart_read_csv(file_bytes):
     if best_df is None or len(best_df.columns) < 2:
         try:
             text = raw_bytes.decode("utf-8", errors="replace")
-            best_df = pd.read_csv(io.StringIO(text), sep=None, engine="python", on_bad_lines="skip")
+            best_df = pd.read_csv(
+                io.StringIO(text),
+                sep=None,
+                engine="python",
+                on_bad_lines="skip",
+            )
         except Exception:
             raise ValueError("Falha catastrófica: Arquivo ilegível ou completamente vazio.")
 
     return best_df
+
 
 # ==========================================================
 # 2. MOTOR SEMÂNTICO (TARGET-CENTRIC SCORING)
@@ -109,7 +124,17 @@ class RobustSemanticEngine:
 
         # ---------------- TARGET: NOME CREDOR / SERVIDOR ----------------
         if target == "nome_credor_servidor":
-            if any(x in col for x in ["fornecedor_nome", "razao_social", "razao social", "credor", "favorecido", "servidor"]):
+            if any(
+                x in col
+                for x in [
+                    "fornecedor_nome",
+                    "razao_social",
+                    "razao social",
+                    "credor",
+                    "favorecido",
+                    "servidor",
+                ]
+            ):
                 score += 50
                 notes.append("Lexical forte")
             elif "nome" in col:
@@ -128,7 +153,11 @@ class RobustSemanticEngine:
                 notes.append("Bônus Contextual (Contratos)")
 
             if samples:
-                none_ratio = sum(1 for s in samples if str(s).strip().lower() in ["none", "", "null", "não informado", "nan"]) / len(samples)
+                none_ratio = sum(
+                    1
+                    for s in samples
+                    if str(s).strip().lower() in ["none", "", "null", "não informado", "nan"]
+                ) / len(samples)
                 if none_ratio > 0.6:
                     penalties += 40
                     notes.append("Penalidade: Coluna majoritariamente vazia")
@@ -139,7 +168,13 @@ class RobustSemanticEngine:
                 score += 50
                 notes.append("Lexical forte")
 
-            has_doc_format = any(re.search(r"\d{2,3}\.?\d{3}\.?\d{3}[/.-]?\d{4}[-.]?\d{2}|\d{3}\.?\d{3}\.?\d{3}[-.]?\d{2}", str(s)) for s in samples)
+            has_doc_format = any(
+                re.search(
+                    r"\d{2,3}\.?\d{3}\.?\d{3}[/.-]?\d{4}[-.]?\d{2}|\d{3}\.?\d{3}\.?\d{3}[-.]?\d{2}",
+                    str(s),
+                )
+                for s in samples
+            )
             if has_doc_format:
                 score += 40
                 notes.append("Conteúdo: Formato de CPF/CNPJ detectado")
@@ -150,7 +185,23 @@ class RobustSemanticEngine:
 
         # ---------------- TARGET: VALOR BRUTO ----------------
         elif target == "valor_bruto":
-            if any(x in col for x in ["valor_contrato", "valor_pago", "valor_empenhado", "valor_liquidado", "valor", "bruto", "liquido", "vencimento", "remuneracao", "pago", "empenhado", "liquidado"]):
+            if any(
+                x in col
+                for x in [
+                    "valor_contrato",
+                    "valor_pago",
+                    "valor_empenhado",
+                    "valor_liquidado",
+                    "valor",
+                    "bruto",
+                    "liquido",
+                    "vencimento",
+                    "remuneracao",
+                    "pago",
+                    "empenhado",
+                    "liquidado",
+                ]
+            ):
                 score += 50
                 notes.append("Lexical forte")
             elif "contrato" in col:
@@ -166,7 +217,14 @@ class RobustSemanticEngine:
                 penalties += 100
                 notes.append("Penalidade Fatal: Conteúdo é data ou num. de processo")
 
-            has_money_like = any(re.search(r"^\d+(?:[.,]\d{2})?$", str(s).replace(".", "").replace(",", ".").replace("R$", "").strip()) for s in samples if str(s).strip())
+            has_money_like = any(
+                re.search(
+                    r"^\d+(?:[.,]\d{2})?$",
+                    str(s).replace(".", "").replace(",", ".").replace("R$", "").strip(),
+                )
+                for s in samples
+                if str(s).strip()
+            )
             if has_money_like:
                 score += 40
                 notes.append("Conteúdo: Formato numérico/monetário detectado")
@@ -179,7 +237,7 @@ class RobustSemanticEngine:
         return {
             "column": col,
             "score": final_score,
-            "notes": " | ".join(notes)
+            "notes": " | ".join(notes),
         }
 
     def map_targets(self):
@@ -203,25 +261,28 @@ class RobustSemanticEngine:
             if candidates and candidates[0]["score"] >= threshold:
                 winner_normalized = candidates[0]["column"]
                 accepted = True
-                
+
                 # Resgata o nome original EXATO para o Pandas não quebrar no rename
                 idx = self.normalized_columns.index(winner_normalized)
                 exact_col_name = self.original_columns[idx]
-                
+
                 # Tranca a vaga
                 final_mapping[exact_col_name] = target
             else:
                 rejection_reason = f"Nenhuma coluna alcançou o threshold ({threshold})"
 
-            self.audit_log.append({
-                "target_field": target,
-                "accepted": accepted,
-                "winner": winner_normalized if accepted else None,
-                "rejection_reason": rejection_reason,
-                "candidates_ranked": candidates
-            })
+            self.audit_log.append(
+                {
+                    "target_field": target,
+                    "accepted": accepted,
+                    "winner": winner_normalized if accepted else None,
+                    "rejection_reason": rejection_reason,
+                    "candidates_ranked": candidates,
+                }
+            )
 
         return final_mapping, self.audit_log
+
 
 def get_semantic_interpretation(df, category, report_type):
     """
@@ -231,7 +292,7 @@ def get_semantic_interpretation(df, category, report_type):
     mapping, audit_log = engine.map_targets()
 
     # TOTAL DE ALVOS ESPERADOS (Nome, Documento, Valor)
-    TOTAL_EXPECTED_TARGETS = 3
+    total_expected_targets = 3
     target_confidences = []
 
     for log in audit_log:
@@ -243,20 +304,15 @@ def get_semantic_interpretation(df, category, report_type):
         winner_score = candidates[0]["score"]
 
         # 1. FATOR BASE (Qualidade isolada do vencedor)
-        # Assumimos que Score 90+ é o teto da excelência (1.0 ou 100%)
         base_conf = min(max(winner_score / 90.0, 0.0), 1.0)
 
         # 2. FATOR DE AMBIGUIDADE (Penalidade por margem de vitória apertada)
         margin_penalty = 0.0
         if len(candidates) > 1:
             runner_up_score = candidates[1]["score"]
-            # Só importa se o segundo colocado era uma opção minimamente viável (> 0)
             if runner_up_score > 0:
                 margin = winner_score - runner_up_score
-                # Se a vitória foi por menos de 30 pontos, aciona o alerta de ambiguidade
                 if margin < 30:
-                    # Margem 0 = Perde 40% (0.40) da confiança por ser um empate técnico
-                    # Margem 30 = Perde 0%
                     margin_penalty = ((30.0 - margin) / 30.0) * 0.40
 
         # confiança mínima se o target foi aceito
@@ -265,15 +321,12 @@ def get_semantic_interpretation(df, category, report_type):
 
     # 3. CONFIANÇA GLOBAL (Fator de Integridade)
     if target_confidences:
-        # Dividir pelo TOTAL ESPERADO (3) pune severamente se o sistema não achou algum alvo vital
-        global_confidence = sum(target_confidences) / TOTAL_EXPECTED_TARGETS
+        global_confidence = sum(target_confidences) / total_expected_targets
     else:
         global_confidence = 0.0
 
-    # Formata para 2 casas decimais com teto de 0.99 (1.0 apenas para humanos validando)
     confidence = round(min(global_confidence, 0.99), 2)
 
-    # Determinação das métricas escolhidas
     chosen_metrics = []
     if "valor_bruto" in mapping.values():
         chosen_metrics.append("valor_bruto")
@@ -281,26 +334,193 @@ def get_semantic_interpretation(df, category, report_type):
     base_json = {
         "interpreted_columns": mapping,
         "chosen_metrics": chosen_metrics,
-        "dashboard_hints": {"group_by": [], 
-        "note": "Motor Robusto com Score Relacional (Margin Penalty)"},
+        "dashboard_hints": {
+            "group_by": [],
+            "note": "Motor Robusto com Score Relacional (Margin Penalty)",
+        },
         "confidence_score": confidence,
-        "audit_log": audit_log
+        "audit_log": audit_log,
     }
 
     return base_json, "hybrid_engine"
 
+
 # ==========================================================
-# 3. ENDPOINT DE PROCESSAMENTO SÍNCRONO
+# 3. INTEGRAÇÃO REAL DA IA COM FALLBACK
+# ==========================================================
+def call_gemini_semantic_mapping(df, category, report_type):
+    original_cols = df.columns.tolist()
+    sample_df = df.dropna(how="all").head(3).fillna("")
+    samples = sample_df.to_dict(orient="records")
+
+    prompt = f"""
+Você é um engenheiro de dados especialista em ETL semântico.
+
+Contexto:
+- Categoria: {category}
+- Tipo de relatório: {report_type}
+- Colunas originais: {json.dumps(original_cols, ensure_ascii=False)}
+- Amostra de linhas: {json.dumps(samples, ensure_ascii=False, indent=2)}
+
+Sua tarefa:
+Mapeie colunas originais para estes alvos canônicos:
+- nome_credor_servidor
+- documento
+- valor_bruto
+
+Regras:
+- "nome_credor_servidor" deve ser o nome do fornecedor/empresa/credor/servidor principal, nunca fiscal.
+- "documento" deve ser CPF ou CNPJ.
+- "valor_bruto" deve ser o valor monetário real, nunca número de contrato, licitação ou data.
+- Não invente colunas.
+- Use apenas colunas que realmente existam na lista original.
+- Se não encontrar um alvo com confiança suficiente, omita esse alvo.
+
+Responda APENAS com JSON puro, sem markdown, sem crases, sem explicações.
+Formato:
+{{
+  "nome_da_coluna_original": "nome_credor_servidor",
+  "outra_coluna_original": "documento",
+  "mais_uma_coluna_original": "valor_bruto"
+}}
+"""
+
+    start_time = time.time()
+
+    try:
+        model = genai.GenerativeModel(GEMINI_MODEL)
+        response = model.generate_content(prompt)
+        latency_ms = int((time.time() - start_time) * 1000)
+
+        raw_text = getattr(response, "text", "") or ""
+
+        json_match = re.search(r"\{.*\}", raw_text, re.DOTALL)
+        if not json_match:
+            raise ValueError("Gemini não retornou JSON válido.")
+
+        parsed = json.loads(json_match.group(0))
+
+        allowed_targets = {"nome_credor_servidor", "documento", "valor_bruto"}
+        validated_mapping = {}
+        used_targets = set()
+
+        for orig_col, target in parsed.items():
+            if orig_col not in original_cols:
+                continue
+            if target not in allowed_targets:
+                continue
+            if target in used_targets:
+                continue
+
+            validated_mapping[orig_col] = target
+            used_targets.add(target)
+
+        if not validated_mapping:
+            raise ValueError("Gemini retornou mapeamento vazio ou inválido após validação.")
+
+        return {
+            "success": True,
+            "mapping": validated_mapping,
+            "latency_ms": latency_ms,
+            "raw_response_text": raw_text,
+            "error_message": None,
+            "provider": "gemini",
+           "model": GEMINI_MODEL,
+        }
+
+    except Exception as e:
+        latency_ms = int((time.time() - start_time) * 1000)
+        return {
+            "success": False,
+            "mapping": {},
+            "latency_ms": latency_ms,
+            "raw_response_text": None,
+            "error_message": str(e),
+            "provider": "gemini",
+            "model": GEMINI_MODEL,
+        }
+
+
+def get_semantic_interpretation_with_ai(df, category, report_type):
+    # 1. Sempre calcula o motor heurístico local primeiro
+    heuristic_json, _ = get_semantic_interpretation(df, category, report_type)
+
+    heuristic_mapping = heuristic_json.get("interpreted_columns", {})
+    heuristic_confidence = heuristic_json.get("confidence_score", 0.0)
+    audit_log = heuristic_json.get("audit_log", [])
+    dashboard_hints = heuristic_json.get(
+        "dashboard_hints",
+        {"group_by": [], "note": "Motor heurístico"},
+    )
+
+    provider = os.getenv("AI_PROVIDER", "none").lower()
+
+    ai_used = False
+    final_source = "heuristic_only"
+    final_mapping = heuristic_mapping
+    ai_provider = None
+    ai_model = None
+    ai_latency_ms = 0
+    ai_raw_response_text = None
+    ai_error_message = None
+
+    # 2. Tenta IA real apenas se configurado
+    if provider == "gemini" and GEMINI_API_KEY:
+        ai_used = True
+        ai_result = call_gemini_semantic_mapping(df, category, report_type)
+
+        ai_provider = ai_result.get("provider")
+        ai_model = ai_result.get("model")
+        ai_latency_ms = ai_result.get("latency_ms", 0)
+        ai_raw_response_text = ai_result.get("raw_response_text")
+        ai_error_message = ai_result.get("error_message")
+
+        if ai_result.get("success") and ai_result.get("mapping"):
+            final_source = "ai_success"
+            final_mapping = ai_result["mapping"]
+        else:
+            final_source = "ai_failed_fallback"
+            final_mapping = heuristic_mapping
+
+    final_chosen_metrics = ["valor_bruto"] if "valor_bruto" in final_mapping.values() else []
+
+    final_json = {
+        "interpreted_columns": final_mapping,
+        "chosen_metrics": final_chosen_metrics,
+        "dashboard_hints": {
+            **dashboard_hints,
+            "note": f"Origem da decisão: {final_source}",
+        },
+        "confidence_score": heuristic_confidence,
+        "audit_log": audit_log,
+    }
+
+    ai_metadata = {
+        "ai_used": ai_used,
+        "ai_provider": ai_provider,
+        "ai_model": ai_model,
+        "ai_latency_ms": ai_latency_ms,
+        "ai_raw_response_text": ai_raw_response_text,
+        "ai_error_message": ai_error_message,
+        "heuristic_confidence_score": heuristic_confidence,
+        "final_decision_source": final_source,
+    }
+
+    return final_json, final_source, ai_metadata
+
+
+# ==========================================================
+# 4. ENDPOINT DE PROCESSAMENTO SÍNCRONO
 # ==========================================================
 @app.post("/process/{upload_id}")
 async def process_upload(upload_id: str):
     try:
-        # Busca registro (Item 1 corrigido)
+        # Busca registro
         res = supabase.table("uploads").select("*").eq("id", upload_id).execute()
         if not res.data or len(res.data) == 0:
             raise HTTPException(status_code=404, detail="Upload não encontrado.")
         up_rec = res.data[0]
-        
+
         if up_rec.get("mapping_status") == "processed":
             return {"message": "Arquivo já processado."}
 
@@ -308,7 +528,7 @@ async def process_upload(upload_id: str):
         storage_res = supabase.storage.from_("uploads").download(up_rec["file_path"])
         file_bytes = io.BytesIO(storage_res)
 
-        # Leitura Robusta
+        # Leitura robusta
         if up_rec["file_path"].lower().endswith((".csv", ".txt")):
             df = smart_read_csv(file_bytes)
         else:
@@ -317,29 +537,43 @@ async def process_upload(upload_id: str):
 
         original_cols = df.columns.tolist()
 
-        # Interpretação Semântica
-        schema_json, source = get_semantic_interpretation(df, up_rec["category"], up_rec["report_type"])
-        
-        # Salva o Mapeamento e Auditoria
-        supabase.table("upload_schema_mappings").insert({
-            "upload_id": upload_id,
-            "city_id": up_rec["city_id"],
-            "category": up_rec["category"],
-            "report_type": up_rec["report_type"],
-            "original_columns_json": original_cols,
-            "interpreted_columns_json": schema_json.get("interpreted_columns", {}),
-            "chosen_metrics_json": schema_json.get("chosen_metrics", []),
-            "dashboard_hints_json": schema_json.get("dashboard_hints", {}),
-            "confidence_score": schema_json.get("confidence_score", 0.0),
-            "source": source,
-            "audit_log_json": schema_json.get("audit_log", [])
-        }).execute()
+        # Interpretação semântica com IA + fallback
+        schema_json, source, ai_meta = get_semantic_interpretation_with_ai(
+            df,
+            up_rec["category"],
+            up_rec["report_type"],
+        )
 
-        # Item 6: A Magia da Preservação do raw_json puro
-        # Extraímos as linhas originais IMACULADAS ANTES do Pandas renomear as colunas
+        # Salva o mapeamento e auditoria
+        supabase.table("upload_schema_mappings").insert(
+            {
+                "upload_id": upload_id,
+                "city_id": up_rec["city_id"],
+                "category": up_rec["category"],
+                "report_type": up_rec["report_type"],
+                "report_label": up_rec.get("report_label"),
+                "original_columns_json": original_cols,
+                "interpreted_columns_json": schema_json.get("interpreted_columns", {}),
+                "chosen_metrics_json": schema_json.get("chosen_metrics", []),
+                "dashboard_hints_json": schema_json.get("dashboard_hints", {}),
+                "confidence_score": schema_json.get("confidence_score", 0.0),
+                "source": source,
+                "audit_log_json": schema_json.get("audit_log", []),
+                "ai_used": ai_meta["ai_used"],
+                "ai_provider": ai_meta["ai_provider"],
+                "ai_model": ai_meta["ai_model"],
+                "ai_latency_ms": ai_meta["ai_latency_ms"],
+                "ai_raw_response_text": ai_meta["ai_raw_response_text"],
+                "ai_error_message": ai_meta["ai_error_message"],
+                "heuristic_confidence_score": ai_meta["heuristic_confidence_score"],
+                "final_decision_source": ai_meta["final_decision_source"],
+            }
+        ).execute()
+
+        # Preserva raw_json puro
         pure_records = df.fillna("").to_dict(orient="records")
 
-        # Agora sim, fazemos o rename para as colunas padronizadas do sistema
+        # Renomeia colunas para o padrão do sistema
         mapped_dict = schema_json.get("interpreted_columns", {})
         df.rename(columns=mapped_dict, inplace=True)
         clean_records = df.fillna("").to_dict(orient="records")
@@ -347,13 +581,19 @@ async def process_upload(upload_id: str):
         records_to_insert = []
         for i in range(len(clean_records)):
             clean_row = clean_records[i]
-            pure_row = pure_records[i] # A linha bruta original intocada
-            
-            # Formatação Segura do Valor Bruto
+            pure_row = pure_records[i]
+
+            # Formatação segura do valor bruto
             v_bruto = clean_row.get("valor_bruto", 0.0)
             try:
                 if isinstance(v_bruto, str):
-                    v_bruto = v_bruto.replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".").strip()
+                    v_bruto = (
+                        v_bruto.replace("R$", "")
+                        .replace(" ", "")
+                        .replace(".", "")
+                        .replace(",", ".")
+                        .strip()
+                    )
                     v_bruto = float(v_bruto) if v_bruto else 0.0
                 elif v_bruto in [None, ""]:
                     v_bruto = 0.0
@@ -361,30 +601,38 @@ async def process_upload(upload_id: str):
                     v_bruto = float(v_bruto)
             except Exception:
                 v_bruto = 0.0
-                
+
             rec = {
                 "upload_id": upload_id,
                 "city_id": up_rec["city_id"],
                 "category": up_rec["category"],
                 "report_type": up_rec["report_type"],
-                "report_label": up_rec["report_label"],
+                "report_label": up_rec.get("report_label"),
                 "nome_credor_servidor": str(clean_row.get("nome_credor_servidor", "Não informado"))[:255],
                 "documento": str(clean_row.get("documento", ""))[:50],
                 "valor_bruto": v_bruto,
                 "metric_type": (schema_json.get("chosen_metrics") or ["padrao"])[0],
-                "raw_json": pure_row  # Salva o arquivo raiz intocado!
+                "raw_json": pure_row,
             }
             records_to_insert.append(rec)
 
-        # Batch Insert seguro contra timeouts (bloqueios de memória)
+        # Batch insert
         batch_size = 1000
         for i in range(0, len(records_to_insert), batch_size):
-            supabase.table("standardized_records").insert(records_to_insert[i:i+batch_size]).execute()
+            supabase.table("standardized_records").insert(records_to_insert[i : i + batch_size]).execute()
 
         # Finaliza e tranca o estado
-        supabase.table("uploads").update({"status": "processed", "mapping_status": "processed"}).eq("id", upload_id).execute()
-        
-        return {"status": "success", "mapping_source": source, "linhas_processadas": len(records_to_insert)}
+        supabase.table("uploads").update(
+            {"status": "processed", "mapping_status": "processed"}
+        ).eq("id", upload_id).execute()
+
+        return {
+            "status": "success",
+            "mapping_source": source,
+            "ai_used": ai_meta["ai_used"],
+            "final_decision_source": ai_meta["final_decision_source"],
+            "linhas_processadas": len(records_to_insert),
+        }
 
     except Exception as e:
         supabase.table("uploads").update({"status": "error"}).eq("id", upload_id).execute()
