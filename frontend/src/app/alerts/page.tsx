@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -95,7 +96,7 @@ export default function AlertsPage() {
 
       if (error) throw new Error(error.message);
 
-      setAlerts((data as AlertRecord[]) || []);
+      setAlerts((data as unknown as AlertRecord[]) || []);
     } catch (error: unknown) {
       setErrorMessage(
         error instanceof Error ? error.message : "Falha ao carregar alertas."
@@ -247,6 +248,13 @@ export default function AlertsPage() {
                 {alert.report_type || alert.report_label || "Não informado"}
               </span>
             </div>
+
+            <Link
+              href={`/alerts/${alert.id}`}
+              className="inline-flex border rounded px-3 py-2 text-sm text-blue-700 hover:bg-blue-50"
+            >
+              Ver detalhe
+            </Link>
           </article>
         ))}
 

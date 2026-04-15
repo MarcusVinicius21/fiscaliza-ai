@@ -157,7 +157,7 @@ export default function DashboardPage() {
 
       setCityCount(citiesRes.count || 0);
       setUploads(uploadsData);
-      setAlerts((alertsRes.data as AlertRecord[]) || []);
+      setAlerts((alertsRes.data as unknown as AlertRecord[]) || []);
       setLogs((logsRes.data as AnalysisLog[]) || []);
 
       if (analyzedUploads.length > 0) {
