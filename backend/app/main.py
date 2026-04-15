@@ -1241,3 +1241,336 @@ RESPONDA APENAS EM JSON VÁLIDO NESTA ESTRUTURA:
             pass
 
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==========================================================
+# ETAPA 8: GERAÇÃO DE TEXTO PARA ARTE
+# ==========================================================
+
+def creative_parse_json(value):
+    if not value:
+        return {}
+
+    if isinstance(value, dict):
+        return value
+
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            return {}
+
+    return {}
+
+
+def creative_text(value, fallback="Não informado"):
+    text = str(value or "").strip()
+    return text if text else fallback
+
+
+def creative_amount(value):
+    if value is None:
+        return 0.0
+
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    text = str(value).replace("R$", "").strip()
+    text = text.replace(".", "").replace(",", ".")
+
+    try:
+        return float(text)
+    except Exception:
+        return 0.0
+
+
+def creative_money(value):
+    amount = creative_amount(value)
+    return f"R$ {amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def creative_pick_raw_fields(raw):
+    if not isinstance(raw, dict):
+        return {}
+
+    allowed_keys = [
+        "numero_contrato",
+        "contrato",
+        "numero_licitacao",
+        "licitacao",
+        "modalidade",
+        "tipo_ato",
+        "situacao",
+        "objeto",
+        "inicio_vigencia",
+        "termino_vigencia",
+        "competencia",
+        "data",
+        "fiscal_nome",
+    ]
+
+    result = {}
+
+    for key in allowed_keys:
+        value = raw.get(key)
+        if value is not None and str(value).strip():
+            result[key] = str(value).strip()
+
+    return result
+
+
+def creative_extract_json(text):
+    cleaned = str(text or "").strip()
+
+    if cleaned.startswith("```"):
+        cleaned = cleaned.replace("```json", "").replace("```", "").strip()
+
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+
+    if start >= 0 and end > start:
+        cleaned = cleaned[start:end + 1]
+
+    try:
+        parsed = json.loads(cleaned)
+        return parsed if isinstance(parsed, dict) else {}
+    except Exception:
+        return {}
+
+
+def creative_normalize_output(parsed, fallback_context):
+    title = creative_text(
+        parsed.get("title"),
+        f"Alerta em {creative_text(fallback_context.get('category_label'), 'dado público')}",
+    )
+
+    subtitle = creative_text(
+        parsed.get("subtitle"),
+        creative_text(fallback_context.get("alert_title"), "Ponto de atenção identificado"),
+    )
+
+    body = creative_text(
+        parsed.get("body"),
+        creative_text(
+            fallback_context.get("alert_explanation"),
+            "Um alerta foi identificado a partir dos dados analisados."
+        ),
+    )
+
+    cta = creative_text(
+        parsed.get("cta"),
+        "Confira os dados e acompanhe a fiscalização.",
+    )
+
+    footer = creative_text(
+        parsed.get("footer"),
+        "Fonte: dados públicos analisados pelo Fiscaliza.AI",
+    )
+
+    return {
+        "title": title[:90],
+        "subtitle": subtitle[:140],
+        "body": body[:260],
+        "cta": cta[:120],
+        "footer": footer[:140],
+    }
+
+
+def creative_category_label(category):
+    labels = {
+        "payroll": "Pessoal / RH",
+        "contracts": "Contratos",
+        "expenses": "Despesas / Pagamentos",
+        "bids": "Licitações",
+        "others": "Outros",
+    }
+
+    return labels.get(str(category or ""), creative_text(category, "Categoria não informada"))
+
+
+@app.post("/creatives/generate/{alert_id}")
+def generate_creative(alert_id: str):
+    try:
+        alert_res = (
+            supabase.table("alerts")
+            .select("*")
+            .eq("id", alert_id)
+            .execute()
+        )
+
+        if not alert_res.data:
+            raise HTTPException(status_code=404, detail="Alerta não encontrado.")
+
+        alert_record = alert_res.data[0]
+        upload_id = alert_record.get("upload_id")
+
+        upload_res = (
+            supabase.table("uploads")
+            .select("id, city_id, file_name, category, report_type, report_label, status, analysis_status, created_at")
+            .eq("id", upload_id)
+            .execute()
+        )
+
+        upload_record = upload_res.data[0] if upload_res.data else {}
+
+        log_res = (
+            supabase.table("ai_analysis_logs")
+            .select("upload_id, input_summary, ai_output, created_at")
+            .eq("upload_id", upload_id)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+
+        analysis_log = log_res.data[0] if log_res.data else {}
+
+        input_summary = creative_parse_json(analysis_log.get("input_summary"))
+        ai_output = creative_parse_json(analysis_log.get("ai_output"))
+        resumo_contextual = creative_parse_json(input_summary.get("resumo_contextual"))
+
+        related_record = None
+        source_record_id = alert_record.get("source_record_id")
+
+        if source_record_id:
+            record_res = (
+                supabase.table("standardized_records")
+                .select("id, upload_id, nome_credor_servidor, documento, valor_bruto, raw_json")
+                .eq("id", source_record_id)
+                .limit(1)
+                .execute()
+            )
+
+            if record_res.data:
+                related_record = record_res.data[0]
+
+        if not related_record and alert_record.get("supplier_name"):
+            record_res = (
+                supabase.table("standardized_records")
+                .select("id, upload_id, nome_credor_servidor, documento, valor_bruto, raw_json")
+                .eq("upload_id", upload_id)
+                .ilike("nome_credor_servidor", f"%{alert_record.get('supplier_name')}%")
+                .limit(1)
+                .execute()
+            )
+
+            if record_res.data:
+                related_record = record_res.data[0]
+
+        if not related_record and creative_amount(alert_record.get("amount")) > 0:
+            record_res = (
+                supabase.table("standardized_records")
+                .select("id, upload_id, nome_credor_servidor, documento, valor_bruto, raw_json")
+                .eq("upload_id", upload_id)
+                .eq("valor_bruto", creative_amount(alert_record.get("amount")))
+                .limit(1)
+                .execute()
+            )
+
+            if record_res.data:
+                related_record = record_res.data[0]
+
+        raw_json = creative_parse_json((related_record or {}).get("raw_json"))
+        raw_fields = creative_pick_raw_fields(raw_json)
+
+        category = upload_record.get("category") or alert_record.get("category")
+        category_label = creative_category_label(category)
+
+        context = {
+            "alert_id": alert_record.get("id"),
+            "upload_id": upload_id,
+            "alert_title": alert_record.get("title"),
+            "alert_explanation": alert_record.get("explanation"),
+            "severity": alert_record.get("severity"),
+            "amount": creative_money(alert_record.get("amount")),
+            "supplier_name": alert_record.get("supplier_name"),
+            "category": category,
+            "category_label": category_label,
+            "report_type": upload_record.get("report_type") or alert_record.get("report_type"),
+            "report_label": upload_record.get("report_label") or alert_record.get("report_label"),
+            "upload_file_name": upload_record.get("file_name"),
+            "resumo_interpretativo": ai_output.get("resumo_interpretativo"),
+            "resumo_contextual_ia": ai_output.get("resumo_contextual_ia"),
+            "tipo_contexto": resumo_contextual.get("tipo_contexto"),
+            "raw_fields": raw_fields,
+        }
+
+        fallback_creative = creative_normalize_output({}, context)
+        ai_used = False
+
+        if os.getenv("AI_PROVIDER", "none").lower() == "gemini" and os.getenv("GEMINI_API_KEY"):
+            prompt = f"""
+Você é um assistente de comunicação pública do Fiscaliza.AI.
+
+Sua tarefa é transformar um alerta técnico em texto curto para uma arte informativa.
+
+REGRAS OBRIGATÓRIAS:
+- Não declare fraude.
+- Não acuse pessoas ou empresas.
+- Use linguagem responsável: "alerta", "ponto de atenção", "indício", "merece verificação".
+- Não invente dados.
+- Use apenas o contexto enviado.
+- Não despeje raw_json.
+- Não cite campos técnicos desnecessários.
+- Seja claro para cidadão comum.
+- Se a categoria for contracts, use linguagem de contrato, fornecedor e valor contratado.
+- Evite linguagem de pagamento para contracts.
+- O texto deve caber em uma arte vertical simples.
+- Responda apenas em JSON válido.
+
+CONTEXTO DO ALERTA:
+{json.dumps(context, ensure_ascii=False, indent=2)}
+
+FORMATO OBRIGATÓRIO:
+{{
+  "title": "título curto, forte e responsável",
+  "subtitle": "subtítulo objetivo",
+  "body": "texto curto explicando o ponto de atenção",
+  "cta": "chamada curta para acompanhamento público",
+  "footer": "fonte curta e rastreável"
+}}
+"""
+            model = genai.GenerativeModel(GEMINI_MODEL)
+            ai_resp = model.generate_content(prompt)
+            ai_text = getattr(ai_resp, "text", "").strip()
+
+            parsed = creative_extract_json(ai_text)
+            creative = creative_normalize_output(parsed, context)
+            ai_used = True
+        else:
+            creative = fallback_creative
+
+        return {
+            "status": "success",
+            "ai_used": ai_used,
+            "alert_id": alert_record.get("id"),
+            "upload_id": upload_id,
+            "source_record_id": source_record_id,
+            "creative": creative,
+            "source": {
+                "alert": {
+                    "title": alert_record.get("title"),
+                    "explanation": alert_record.get("explanation"),
+                    "severity": alert_record.get("severity"),
+                    "amount": alert_record.get("amount"),
+                    "supplier_name": alert_record.get("supplier_name"),
+                },
+                "upload": {
+                    "file_name": upload_record.get("file_name"),
+                    "category": category,
+                    "category_label": category_label,
+                    "report_type": upload_record.get("report_type"),
+                    "report_label": upload_record.get("report_label"),
+                    "analysis_status": upload_record.get("analysis_status"),
+                },
+                "raw_fields": raw_fields,
+            },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao gerar arte do alerta: {str(e)}",
+        )

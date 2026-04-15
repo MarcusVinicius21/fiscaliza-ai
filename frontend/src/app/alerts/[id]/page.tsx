@@ -530,6 +530,15 @@ export default function AlertDetailPage() {
           <p className="text-sm text-gray-700">
             {alert.explanation || "Sem explicação registrada."}
           </p>
+
+          <div>
+            <Link
+              href={`/creatives/${alert.id}`}
+              className="inline-flex border rounded px-3 py-2 text-sm text-blue-700 hover:bg-blue-50"
+            >
+              Gerar arte
+            </Link>
+          </div>
         </div>
       </header>
 
