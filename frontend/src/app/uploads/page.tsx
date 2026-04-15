@@ -17,6 +17,7 @@ interface UploadRecord {
   report_type?: string;
   report_label?: string;
   status: string;
+  analysis_status?: string;
   created_at: string;
   cities: { name: string; state: string } | null;
 }
@@ -76,7 +77,7 @@ export default function UploadsPage() {
   const fetchUploads = async () => {
     const { data: uploadsData } = await supabase
       .from("uploads")
-      .select("id, file_name, category, report_type, report_label, status, created_at, cities(name, state)")
+      .select("id, file_name, category, report_type, report_label, status, analysis_status, created_at, cities(name, state)")
       .order("created_at", { ascending: false });
     setUploads((uploadsData as unknown as UploadRecord[]) || []);
     setLoading(false);
@@ -130,6 +131,28 @@ export default function UploadsPage() {
       alert("Erro de conexão com o Backend Python na porta 8000.");
     } finally {
       fetchUploads();
+    }
+  };
+
+  const handleAnalyze = async (uploadId: string) => {
+    try {
+      alert("Iniciando análise dos dados. Isso pode levar alguns segundos...");
+      const response = await fetch(`http://localhost:8000/analyze/${uploadId}`, {
+        method: "POST",
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert(data.message || "Análise concluída com sucesso!");
+      } else {
+        alert(`Erro na análise: ${data.detail || "Falha desconhecida"}`);
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao conectar com a API de análise.");
+    } finally {
+      await fetchUploads();
     }
   };
 
@@ -206,9 +229,35 @@ export default function UploadsPage() {
                     {up.status}
                   </span>
                 </td>
-                <td className="p-4 text-sm">
-                  {up.status === 'pending' && (
-                    <button onClick={() => handleProcess(up.id)} className="px-3 py-1 bg-slate-800 text-white rounded hover:bg-slate-700">Processar IA</button>
+                <td className="p-4 text-sm flex gap-2 items-center">
+                  {up.status === "pending" && (
+                    <button
+                      onClick={() => handleProcess(up.id)}
+                      className="px-3 py-1 bg-slate-800 text-white rounded hover:bg-slate-700"
+                    >
+                      Processar IA
+                    </button>
+                  )}
+
+                  {up.status === "processed" && up.analysis_status !== "analyzed" && (
+                    <button
+                      onClick={() => handleAnalyze(up.id)}
+                      className="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700"
+                    >
+                      Rodar Análise IA
+                    </button>
+                  )}
+
+                  {up.analysis_status === "analyzed" && (
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      Analisado
+                    </span>
+                  )}
+
+                  {up.analysis_status === "error" && (
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                      Erro na análise
+                    </span>
                   )}
                 </td>
               </tr>

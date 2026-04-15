@@ -637,3 +637,269 @@ async def process_upload(upload_id: str):
     except Exception as e:
         supabase.table("uploads").update({"status": "error"}).eq("id", upload_id).execute()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==========================================================
+# ETAPA 5: MOTOR DE ANÁLISE OBJETIVA E IA
+# ==========================================================
+@app.post("/analyze/{upload_id}")
+async def analyze_upload(upload_id: str):
+    def safe_parse_amount(value):
+        try:
+            if value in [None, ""]:
+                return 0.0
+            if isinstance(value, (int, float)):
+                return float(value)
+
+            txt = str(value).strip()
+            txt = txt.replace("R$", "").replace(" ", "")
+            txt = txt.replace(".", "").replace(",", ".")
+            return float(txt) if txt else 0.0
+        except Exception:
+            return 0.0
+
+    def safe_parse_ai_json(ai_text: str):
+        text = (ai_text or "").strip()
+
+        if text.startswith("```"):
+            text = re.sub(r"^```(?:json)?\s*", "", text)
+            text = re.sub(r"\s*```$", "", text)
+
+        match = re.search(r"\{.*\}", text, flags=re.DOTALL)
+        if not match:
+            raise ValueError("A IA não retornou um JSON utilizável.")
+
+        parsed = json.loads(match.group(0))
+
+        if not isinstance(parsed, dict):
+            raise ValueError("A resposta da IA não é um objeto JSON.")
+
+        if not isinstance(parsed.get("alertas", []), list):
+            parsed["alertas"] = []
+
+        if "resumo_interpretativo" not in parsed or not isinstance(parsed["resumo_interpretativo"], str):
+            parsed["resumo_interpretativo"] = "Resumo interpretativo indisponível."
+
+        return parsed
+
+    try:
+        # 1. Buscar metadados do upload
+        up_res = supabase.table("uploads").select("*").eq("id", upload_id).execute()
+        if not up_res.data:
+            raise HTTPException(status_code=404, detail="Upload não encontrado.")
+
+        upload_record = up_res.data[0]
+
+        if upload_record.get("status") != "processed":
+            raise HTTPException(
+                status_code=400,
+                detail="O arquivo precisa ser processado antes da análise."
+            )
+
+        if upload_record.get("analysis_status") == "analyzed":
+            return {
+                "status": "success",
+                "message": "Este upload já foi analisado anteriormente."
+            }
+
+        # Marca como processando para reduzir risco de clique duplo / corrida
+        supabase.table("uploads").update({
+            "analysis_status": "processing"
+        }).eq("id", upload_id).execute()
+
+        # 2. Buscar registros padronizados
+        rec_res = supabase.table("standardized_records").select("*").eq("upload_id", upload_id).execute()
+        records = rec_res.data or []
+
+        if not records:
+            raise HTTPException(
+                status_code=400,
+                detail="Nenhum registro padronizado encontrado para este upload."
+            )
+
+        # 3. Análise objetiva com Pandas
+        df = pd.DataFrame(records)
+        df["valor_bruto"] = pd.to_numeric(df["valor_bruto"], errors="coerce").fillna(0)
+
+        total_registros = len(df)
+        valor_total = float(df["valor_bruto"].sum())
+
+        df_valid = df[df["valor_bruto"] > 0].copy()
+
+        top_fornecedores = (
+            df_valid.groupby("nome_credor_servidor", dropna=False)["valor_bruto"]
+            .sum()
+            .reset_index()
+            .sort_values("valor_bruto", ascending=False)
+            .head(5)
+            .to_dict("records")
+        )
+
+        maiores_valores = (
+            df_valid.nlargest(5, "valor_bruto")[["nome_credor_servidor", "valor_bruto", "documento"]]
+            .to_dict("records")
+        )
+
+        duplicados_raw = df_valid[df_valid.duplicated(
+            subset=["nome_credor_servidor", "valor_bruto"],
+            keep=False
+        )]
+
+        duplicados_resumo = (
+            duplicados_raw.groupby(["nome_credor_servidor", "valor_bruto"])
+            .size()
+            .reset_index(name="contagem")
+            .sort_values("contagem", ascending=False)
+            .to_dict("records")
+        )
+
+        resumo_matematico = {
+            "total_registros": total_registros,
+            "valor_total_soma": valor_total,
+            "top_5_concentracao_volume": top_fornecedores,
+            "top_5_maiores_pagamentos_individuais": maiores_valores,
+            "alerta_potencial_duplicidade": duplicados_resumo[:10]
+        }
+
+        input_summary_text = json.dumps(resumo_matematico, ensure_ascii=False, indent=2)
+
+        # 4. Interpretação assistida por IA
+        ai_json = {
+            "resumo_interpretativo": "IA desativada ou não executada.",
+            "alertas": []
+        }
+
+        if os.getenv("AI_PROVIDER", "none").lower() == "gemini" and os.getenv("GEMINI_API_KEY"):
+            prompt = f"""
+Você é um assistente analítico focado em transparência pública.
+
+Contexto do upload:
+- Categoria: {upload_record.get("category")}
+- Tipo de relatório: {upload_record.get("report_type")}
+- Rótulo: {upload_record.get("report_label")}
+
+Sua tarefa:
+1. Ler os números resumidos abaixo.
+2. Identificar concentrações relevantes, repetições e padrões matemáticos objetivos.
+3. Escrever um resumo interpretativo curto.
+4. Gerar alertas apenas se os números justificarem.
+5. NÃO declarar fraude.
+6. NÃO inventar dados.
+7. NÃO extrapolar além do resumo fornecido.
+
+DADOS MATEMÁTICOS:
+{input_summary_text}
+
+RESPONDA APENAS EM JSON VÁLIDO NESTA ESTRUTURA:
+{{
+  "resumo_interpretativo": "texto curto aqui",
+  "alertas": [
+    {{
+      "title": "Título curto",
+      "explanation": "Explicação objetiva",
+      "severity": "baixa",
+      "amount": 0.0,
+      "supplier_name": "Fornecedor"
+    }}
+  ]
+}}
+"""
+            try:
+                model = genai.GenerativeModel(GEMINI_MODEL)
+                ai_resp = model.generate_content(prompt)
+                ai_text = getattr(ai_resp, "text", "").strip()
+                ai_json = safe_parse_ai_json(ai_text)
+            except Exception as e:
+                ai_json = {
+                    "resumo_interpretativo": (
+                        "Análise matemática concluída, mas houve erro na interpretação textual da IA: "
+                        f"{str(e)}"
+                    ),
+                    "alertas": []
+                }
+
+        # 5. Limpa saída anterior deste upload para evitar duplicação em retry
+        supabase.table("alerts").delete().eq("upload_id", upload_id).execute()
+        supabase.table("ai_analysis_logs").delete().eq("upload_id", upload_id).execute()
+
+        # 6. Persistir log da análise
+        supabase.table("ai_analysis_logs").insert({
+            "upload_id": upload_id,
+            "city_id": upload_record["city_id"],
+            "category": upload_record.get("category"),
+            "report_type": upload_record.get("report_type"),
+            "report_label": upload_record.get("report_label"),
+            "prompt_type": "analise_agregada_v1",
+            "input_summary": input_summary_text,
+            "ai_output": json.dumps(ai_json, ensure_ascii=False)
+        }).execute()
+
+        # 7. Alertas objetivos mínimos (independentes da IA)
+        alertas_insert = []
+
+        for dup in duplicados_resumo[:10]:
+            fornecedor = str(dup.get("nome_credor_servidor") or "").strip()
+            valor = safe_parse_amount(dup.get("valor_bruto"))
+            contagem = int(dup.get("contagem") or 0)
+
+            if fornecedor and valor > 0 and contagem >= 2:
+                alertas_insert.append({
+                    "upload_id": upload_id,
+                    "city_id": upload_record["city_id"],
+                    "category": upload_record.get("category"),
+                    "report_type": upload_record.get("report_type"),
+                    "report_label": upload_record.get("report_label"),
+                    "title": "Possível repetição por fornecedor e valor",
+                    "explanation": f"O fornecedor '{fornecedor}' aparece {contagem} vezes com o valor exato de {valor:.2f}.",
+                    "severity": "media" if contagem >= 3 else "baixa",
+                    "amount": valor,
+                    "supplier_name": fornecedor
+                })
+
+        # 8. Alertas da IA
+        if ai_json.get("alertas") and isinstance(ai_json["alertas"], list):
+            for alert in ai_json["alertas"]:
+                if not isinstance(alert, dict):
+                    continue
+
+                alertas_insert.append({
+                    "upload_id": upload_id,
+                    "city_id": upload_record["city_id"],
+                    "category": upload_record.get("category"),
+                    "report_type": upload_record.get("report_type"),
+                    "report_label": upload_record.get("report_label"),
+                    "title": str(alert.get("title", "Alerta Encontrado"))[:255],
+                    "explanation": str(alert.get("explanation", "")),
+                    "severity": str(alert.get("severity", "baixa"))[:20],
+                    "amount": safe_parse_amount(alert.get("amount", 0)),
+                    "supplier_name": str(alert.get("supplier_name", ""))[:255]
+                })
+
+        if alertas_insert:
+            supabase.table("alerts").insert(alertas_insert).execute()
+
+        # 9. Finalizar
+        supabase.table("uploads").update({
+            "analysis_status": "analyzed"
+        }).eq("id", upload_id).execute()
+
+        return {
+            "status": "success",
+            "message": "Análise gerada e salva com sucesso!",
+            "total_registros": total_registros,
+            "valor_total": valor_total,
+            "alertas_gerados": len(alertas_insert)
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        try:
+            supabase.table("uploads").update({
+                "analysis_status": "error"
+            }).eq("id", upload_id).execute()
+        except Exception:
+            pass
+
+        raise HTTPException(status_code=500, detail=str(e))
