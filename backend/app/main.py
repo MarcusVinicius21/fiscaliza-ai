@@ -680,7 +680,213 @@ async def analyze_upload(upload_id: str):
         if "resumo_interpretativo" not in parsed or not isinstance(parsed["resumo_interpretativo"], str):
             parsed["resumo_interpretativo"] = "Resumo interpretativo indisponível."
 
+        if "resumo_contextual_ia" not in parsed or not isinstance(parsed["resumo_contextual_ia"], str):
+            parsed["resumo_contextual_ia"] = "Resumo contextual indisponível."
+
+        parsed.pop("resumo_contextual", None)
+
         return parsed
+
+    def normalize_text(value):
+        txt = str(value or "").strip().lower()
+        txt = re.sub(r"\s+", " ", txt)
+        if txt in {"", "none", "null", "nan", "nao informado", "não informado"}:
+            return ""
+        return txt
+
+    def get_raw_dict(row):
+        raw = row.get("raw_json", {})
+        if isinstance(raw, dict):
+            return raw
+        if isinstance(raw, str):
+            try:
+                parsed = json.loads(raw)
+                return parsed if isinstance(parsed, dict) else {}
+            except Exception:
+                return {}
+        return {}
+
+    def raw_value(row, keys):
+        raw = get_raw_dict(row)
+        for key in keys:
+            value = raw.get(key)
+            if normalize_text(value):
+                return str(value).strip()
+        return ""
+
+    def distinct_raw_values(group, keys, limit=5):
+        values = []
+        seen = set()
+
+        for _, row in group.iterrows():
+            value = raw_value(row, keys)
+            norm = normalize_text(value)
+
+            if norm and norm not in seen:
+                values.append(value)
+                seen.add(norm)
+
+            if len(values) >= limit:
+                break
+
+        return values
+
+    def build_contract_signature(row):
+        signature_parts = [
+            str(row.get("documento", "") or ""),
+            raw_value(row, ["numero_contrato", "contrato"]),
+            raw_value(row, ["numero_licitacao", "licitacao"]),
+            raw_value(row, ["data_assinatura"]),
+            raw_value(row, ["inicio_vigencia"]),
+            raw_value(row, ["termino_vigencia"]),
+            raw_value(row, ["objeto"]),
+            raw_value(row, ["modalidade"]),
+            raw_value(row, ["tipo_ato"]),
+        ]
+        normalized_parts = [
+            normalize_text(part)
+            for part in signature_parts
+            if normalize_text(part)
+        ]
+        return "|".join(normalized_parts)
+
+    def summarize_raw_dimension(df_input, raw_key, limit=5):
+        if df_input.empty:
+            return []
+
+        temp = df_input.copy()
+        temp["_raw_dimension"] = temp.apply(lambda row: raw_value(row, [raw_key]), axis=1)
+        temp = temp[temp["_raw_dimension"].apply(lambda value: bool(normalize_text(value)))]
+
+        if temp.empty:
+            return []
+
+        grouped = (
+            temp.groupby("_raw_dimension", dropna=False)
+            .agg(
+                valor_total=("valor_bruto", "sum"),
+                qtd_registros=("valor_bruto", "size"),
+            )
+            .reset_index()
+            .sort_values("valor_total", ascending=False)
+            .head(limit)
+        )
+
+        rows = []
+        for item in grouped.to_dict("records"):
+            rows.append({
+                raw_key: item.get("_raw_dimension"),
+                "valor_total": float(item.get("valor_total") or 0),
+                "qtd_registros": int(item.get("qtd_registros") or 0),
+            })
+
+        return rows
+
+    def build_resumo_contextual(df_input, category, repeticoes_estruturais_ignoradas):
+        if category != "contracts":
+            return {
+                "tipo_contexto": category or "geral",
+                "observacao": "Resumo contextual especifico ainda nao aplicado para esta categoria.",
+            }
+
+        maiores_contextualizados = []
+        for row in df_input.nlargest(5, "valor_bruto").to_dict("records"):
+            maiores_contextualizados.append({
+                "fornecedor": row.get("nome_credor_servidor"),
+                "documento": row.get("documento"),
+                "valor_contrato": safe_parse_amount(row.get("valor_bruto")),
+                "numero_contrato": raw_value(row, ["numero_contrato", "contrato"]),
+                "numero_licitacao": raw_value(row, ["numero_licitacao", "licitacao"]),
+                "modalidade": raw_value(row, ["modalidade"]),
+                "tipo_ato": raw_value(row, ["tipo_ato"]),
+                "situacao": raw_value(row, ["situacao"]),
+                "objeto": raw_value(row, ["objeto"]),
+                "inicio_vigencia": raw_value(row, ["inicio_vigencia"]),
+                "termino_vigencia": raw_value(row, ["termino_vigencia"]),
+            })
+
+        return {
+            "tipo_contexto": "contracts",
+            "campos_raw_utilizados": [
+                "tipo_ato",
+                "modalidade",
+                "situacao",
+                "numero_contrato",
+                "numero_licitacao",
+                "objeto",
+                "inicio_vigencia",
+                "termino_vigencia",
+            ],
+            "por_modalidade": summarize_raw_dimension(df_input, "modalidade"),
+            "por_tipo_ato": summarize_raw_dimension(df_input, "tipo_ato"),
+            "por_situacao": summarize_raw_dimension(df_input, "situacao"),
+            "maiores_contratos_contextualizados": maiores_contextualizados,
+            "repeticoes_estruturais_ignoradas": repeticoes_estruturais_ignoradas[:10],
+        }
+
+    def classify_alert(title, explanation):
+        combined = normalize_text(f"{title} {explanation}")
+
+        if any(token in combined for token in ["repet", "duplic", "ident", "idênt"]):
+            return "repeticao"
+
+        if "concentr" in combined:
+            return "concentracao"
+
+        return "geral"
+
+    def contract_safe_text(text):
+        adjusted = str(text or "")
+        replacements = {
+            "Pagamentos": "Contratos",
+            "pagamentos": "contratos",
+            "Pagamento": "Contrato",
+            "pagamento": "contrato",
+            "Credor": "Fornecedor",
+            "credor": "fornecedor",
+            "recebeu": "consta com",
+            "receberam": "constam com",
+        }
+        for old, new in replacements.items():
+            adjusted = adjusted.replace(old, new)
+
+        return adjusted
+
+    def make_alert_key(alert):
+        family = classify_alert(alert.get("title", ""), alert.get("explanation", ""))
+        supplier = normalize_text(alert.get("supplier_name"))
+        amount = round(safe_parse_amount(alert.get("amount")), 2)
+
+        if family in {"repeticao", "concentracao"} and supplier:
+            return (family, supplier, amount)
+
+        title = normalize_text(alert.get("title"))[:120]
+        return (family, supplier, amount, title)
+
+    def should_skip_alert(alert):
+        if not is_contracts:
+            return False
+
+        family = classify_alert(alert.get("title", ""), alert.get("explanation", ""))
+        if family != "repeticao":
+            return False
+
+        supplier = normalize_text(alert.get("supplier_name"))
+        amount = round(safe_parse_amount(alert.get("amount")), 2)
+        return (supplier, amount) in suppressed_contract_repetition_keys
+
+    def add_alert(alert):
+        if should_skip_alert(alert):
+            return
+
+        key = make_alert_key(alert)
+        if key in seen_alert_keys:
+            return
+
+        seen_alert_keys.add(key)
+        alertas_insert.append(alert)
+
+    analysis_started = False
 
     try:
         # 1. Buscar metadados do upload
@@ -706,6 +912,7 @@ async def analyze_upload(upload_id: str):
         supabase.table("uploads").update({
             "analysis_status": "processing"
         }).eq("id", upload_id).execute()
+        analysis_started = True
 
         # 2. Buscar registros padronizados
         rec_res = supabase.table("standardized_records").select("*").eq("upload_id", upload_id).execute()
@@ -721,13 +928,81 @@ async def analyze_upload(upload_id: str):
         df = pd.DataFrame(records)
         df["valor_bruto"] = pd.to_numeric(df["valor_bruto"], errors="coerce").fillna(0)
 
-        total_registros = len(df)
-        valor_total = float(df["valor_bruto"].sum())
+        is_contracts = upload_record.get("category") == "contracts"
+        registro_label = "contrato" if is_contracts else "pagamento"
+        registro_label_plural = "contratos" if is_contracts else "pagamentos"
+        valor_label = "valor contratado" if is_contracts else "valor bruto"
 
         df_valid = df[df["valor_bruto"] > 0].copy()
+        df_analysis = df_valid.copy()
+
+        repeticoes_estruturais_ignoradas = []
+        duplicados_resumo = []
+
+        if is_contracts:
+            df_analysis["_contract_signature"] = df_analysis.apply(build_contract_signature, axis=1)
+
+            duplicated_candidates = df_analysis[df_analysis.duplicated(
+                subset=["nome_credor_servidor", "documento", "valor_bruto"],
+                keep=False
+            )].copy()
+
+            for (fornecedor, documento, valor), group in duplicated_candidates.groupby(
+                ["nome_credor_servidor", "documento", "valor_bruto"]
+            ):
+                signatures = {
+                    signature
+                    for signature in group["_contract_signature"].tolist()
+                    if normalize_text(signature)
+                }
+
+                base_item = {
+                    "nome_credor_servidor": fornecedor,
+                    "documento": documento,
+                    "valor_bruto": safe_parse_amount(valor),
+                    "contagem": int(len(group)),
+                    "contextos_contratuais_distintos": int(len(signatures)) if signatures else None,
+                }
+
+                if signatures and len(signatures) == 1:
+                    first_row = group.iloc[0]
+                    repeticoes_estruturais_ignoradas.append({
+                        **base_item,
+                        "motivo": "Mesmo contexto contratual repetido; variacao estrutural do arquivo, como fiscal diferente.",
+                        "numero_contrato": raw_value(first_row, ["numero_contrato", "contrato"]),
+                        "numero_licitacao": raw_value(first_row, ["numero_licitacao", "licitacao"]),
+                        "objeto": raw_value(first_row, ["objeto"]),
+                        "fiscais_encontrados": distinct_raw_values(group, ["fiscal_nome"]),
+                    })
+                else:
+                    duplicados_resumo.append(base_item)
+
+            df_analysis = df_analysis.drop_duplicates(
+                subset=["nome_credor_servidor", "documento", "valor_bruto", "_contract_signature"],
+                keep="first",
+            ).copy()
+
+            duplicados_resumo.sort(key=lambda item: item.get("contagem", 0), reverse=True)
+
+        else:
+            duplicados_raw = df_valid[df_valid.duplicated(
+                subset=["nome_credor_servidor", "valor_bruto"],
+                keep=False
+            )]
+
+            duplicados_resumo = (
+                duplicados_raw.groupby(["nome_credor_servidor", "valor_bruto"])
+                .size()
+                .reset_index(name="contagem")
+                .sort_values("contagem", ascending=False)
+                .to_dict("records")
+            )
+
+        total_registros = len(df_analysis)
+        valor_total = float(df_analysis["valor_bruto"].sum())
 
         top_fornecedores = (
-            df_valid.groupby("nome_credor_servidor", dropna=False)["valor_bruto"]
+            df_analysis.groupby("nome_credor_servidor", dropna=False)["valor_bruto"]
             .sum()
             .reset_index()
             .sort_values("valor_bruto", ascending=False)
@@ -735,30 +1010,35 @@ async def analyze_upload(upload_id: str):
             .to_dict("records")
         )
 
-        maiores_valores = (
-            df_valid.nlargest(5, "valor_bruto")[["nome_credor_servidor", "valor_bruto", "documento"]]
+        maiores_registros = (
+            df_analysis.nlargest(5, "valor_bruto")[["nome_credor_servidor", "valor_bruto", "documento"]]
             .to_dict("records")
         )
 
-        duplicados_raw = df_valid[df_valid.duplicated(
-            subset=["nome_credor_servidor", "valor_bruto"],
-            keep=False
-        )]
+        resumo_contextual = build_resumo_contextual(
+            df_analysis,
+            upload_record.get("category"),
+            repeticoes_estruturais_ignoradas,
+        )
 
-        duplicados_resumo = (
-            duplicados_raw.groupby(["nome_credor_servidor", "valor_bruto"])
-            .size()
-            .reset_index(name="contagem")
-            .sort_values("contagem", ascending=False)
-            .to_dict("records")
+        maiores_key = (
+            "top_5_maiores_contratos_individuais"
+            if is_contracts
+            else "top_5_maiores_pagamentos_individuais"
+        )
+        duplicidade_key = (
+            "alerta_potencial_repeticao_contratual"
+            if is_contracts
+            else "alerta_potencial_duplicidade"
         )
 
         resumo_matematico = {
             "total_registros": total_registros,
             "valor_total_soma": valor_total,
             "top_5_concentracao_volume": top_fornecedores,
-            "top_5_maiores_pagamentos_individuais": maiores_valores,
-            "alerta_potencial_duplicidade": duplicados_resumo[:10]
+            maiores_key: maiores_registros,
+            duplicidade_key: duplicados_resumo[:10],
+            "resumo_contextual": resumo_contextual,
         }
 
         input_summary_text = json.dumps(resumo_matematico, ensure_ascii=False, indent=2)
@@ -766,6 +1046,7 @@ async def analyze_upload(upload_id: str):
         # 4. Interpretação assistida por IA
         ai_json = {
             "resumo_interpretativo": "IA desativada ou não executada.",
+            "resumo_contextual_ia": "Resumo contextual indisponível ou IA não executada.",
             "alertas": []
         }
 
@@ -777,22 +1058,30 @@ Contexto do upload:
 - Categoria: {upload_record.get("category")}
 - Tipo de relatório: {upload_record.get("report_type")}
 - Rótulo: {upload_record.get("report_label")}
+- Semantica correta desta categoria: trate os registros como {registro_label_plural}.
+- Unidade analisada: cada linha representa um {registro_label}.
+- Campo financeiro principal: {valor_label}.
 
 Sua tarefa:
-1. Ler os números resumidos abaixo.
-2. Identificar concentrações relevantes, repetições e padrões matemáticos objetivos.
+1. Ler os números resumidos e contextuais abaixo.
+2. Identificar concentracoes relevantes, repeticoes analiticas e padroes matematicos objetivos.
 3. Escrever um resumo interpretativo curto.
 4. Gerar alertas apenas se os números justificarem.
 5. NÃO declarar fraude.
 6. NÃO inventar dados.
 7. NÃO extrapolar além do resumo fornecido.
+8. Se a categoria for contracts, NAO use linguagem de pagamento; use contrato, fornecedor e valor contratado.
+9. Se resumo_contextual.repeticoes_estruturais_ignoradas listar itens, NAO gere alerta para esses itens.
+10. resumo_contextual_ia deve ser texto curto, baseado apenas no contexto tecnico enviado, sem inventar campos e sem despejar raw_json.
+11. Para contracts, diferencie repeticao estrutural do arquivo de repeticao contratual analiticamente relevante.
 
-DADOS MATEMÁTICOS:
+DADOS MATEMATICOS E CONTEXTUAIS:
 {input_summary_text}
 
 RESPONDA APENAS EM JSON VÁLIDO NESTA ESTRUTURA:
 {{
   "resumo_interpretativo": "texto curto aqui",
+  "resumo_contextual_ia": "síntese textual curta do contexto técnico recebido",
   "alertas": [
     {{
       "title": "Título curto",
@@ -815,8 +1104,23 @@ RESPONDA APENAS EM JSON VÁLIDO NESTA ESTRUTURA:
                         "Análise matemática concluída, mas houve erro na interpretação textual da IA: "
                         f"{str(e)}"
                     ),
+                    "resumo_contextual_ia": "Resumo contextual indisponível por erro na interpretação textual da IA.",
                     "alertas": []
                 }
+
+        if is_contracts:
+            ai_json["resumo_interpretativo"] = contract_safe_text(
+                ai_json.get("resumo_interpretativo", "")
+            )
+            ai_json["resumo_contextual_ia"] = contract_safe_text(
+                ai_json.get("resumo_contextual_ia", "")
+            )
+            if isinstance(ai_json.get("alertas"), list):
+                for alert in ai_json["alertas"]:
+                    if not isinstance(alert, dict):
+                        continue
+                    alert["title"] = contract_safe_text(alert.get("title", ""))
+                    alert["explanation"] = contract_safe_text(alert.get("explanation", ""))
 
         # 5. Limpa saída anterior deste upload para evitar duplicação em retry
         supabase.table("alerts").delete().eq("upload_id", upload_id).execute()
@@ -836,6 +1140,14 @@ RESPONDA APENAS EM JSON VÁLIDO NESTA ESTRUTURA:
 
         # 7. Alertas objetivos mínimos (independentes da IA)
         alertas_insert = []
+        seen_alert_keys = set()
+        suppressed_contract_repetition_keys = {
+            (
+                normalize_text(item.get("nome_credor_servidor")),
+                round(safe_parse_amount(item.get("valor_bruto")), 2),
+            )
+            for item in repeticoes_estruturais_ignoradas
+        }
 
         for dup in duplicados_resumo[:10]:
             fornecedor = str(dup.get("nome_credor_servidor") or "").strip()
@@ -843,14 +1155,32 @@ RESPONDA APENAS EM JSON VÁLIDO NESTA ESTRUTURA:
             contagem = int(dup.get("contagem") or 0)
 
             if fornecedor and valor > 0 and contagem >= 2:
-                alertas_insert.append({
+                if is_contracts:
+                    contextos = dup.get("contextos_contratuais_distintos")
+                    context_text = (
+                        f" em {contextos} contextos contratuais distintos"
+                        if contextos
+                        else " sem contexto contratual suficiente para classificar como repeticao estrutural"
+                    )
+                    title = "Possivel repeticao de contrato por fornecedor e valor"
+                    explanation = (
+                        f"O fornecedor '{fornecedor}' aparece {contagem} vezes com o mesmo "
+                        f"valor contratado de {valor:.2f}{context_text}."
+                    )
+                else:
+                    title = "Possível repetição por fornecedor e valor"
+                    explanation = (
+                        f"O fornecedor '{fornecedor}' aparece {contagem} vezes com o valor exato de {valor:.2f}."
+                    )
+
+                add_alert({
                     "upload_id": upload_id,
                     "city_id": upload_record["city_id"],
                     "category": upload_record.get("category"),
                     "report_type": upload_record.get("report_type"),
                     "report_label": upload_record.get("report_label"),
-                    "title": "Possível repetição por fornecedor e valor",
-                    "explanation": f"O fornecedor '{fornecedor}' aparece {contagem} vezes com o valor exato de {valor:.2f}.",
+                    "title": title,
+                    "explanation": explanation,
                     "severity": "media" if contagem >= 3 else "baixa",
                     "amount": valor,
                     "supplier_name": fornecedor
@@ -862,7 +1192,7 @@ RESPONDA APENAS EM JSON VÁLIDO NESTA ESTRUTURA:
                 if not isinstance(alert, dict):
                     continue
 
-                alertas_insert.append({
+                add_alert({
                     "upload_id": upload_id,
                     "city_id": upload_record["city_id"],
                     "category": upload_record.get("category"),
@@ -892,6 +1222,14 @@ RESPONDA APENAS EM JSON VÁLIDO NESTA ESTRUTURA:
         }
 
     except HTTPException:
+        if analysis_started:
+            try:
+                supabase.table("uploads").update({
+                    "analysis_status": "error"
+                }).eq("id", upload_id).execute()
+            except Exception:
+                pass
+
         raise
 
     except Exception as e:
