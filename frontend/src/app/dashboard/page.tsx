@@ -54,6 +54,18 @@ function parseJson(value: unknown) {
   }
 }
 
+function asRecordArray(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (item): item is Record<string, unknown> =>
+      Boolean(item) && typeof item === "object" && !Array.isArray(item)
+  );
+}
+
+function textOrEmpty(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 function parseAmount(value: unknown) {
   if (value === null || value === undefined || value === "") return 0;
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -236,6 +248,10 @@ export default function DashboardPage() {
 
   const selectedInput = parseJson(selectedLog?.input_summary);
   const selectedAiOutput = parseJson(selectedLog?.ai_output);
+  const insightsExecutivos = asRecordArray(
+    selectedAiOutput["insights_executivos"]
+  );
+  const primaryInsight = insightsExecutivos[0] || null;
 
   const totalRegistros = Number(selectedInput["total_registros"] || 0);
   const valorTotal = parseAmount(selectedInput["valor_total_soma"]);
@@ -299,6 +315,22 @@ export default function DashboardPage() {
     valorTotal > 0 && primaryAlertAmount > 0
       ? (primaryAlertAmount / valorTotal) * 100
       : 0;
+  const primaryHeadline =
+    textOrEmpty(primaryInsight?.["headline"]) ||
+    primaryAlert?.title ||
+    "Nenhum alerta encontrado neste upload";
+  const primarySubheadline =
+    textOrEmpty(primaryInsight?.["subheadline"]) ||
+    primaryAlert?.explanation ||
+    "Quando houver alertas, o principal sinal aparecerá aqui com valor, fornecedor e motivo.";
+  const primaryTranslation =
+    textOrEmpty(primaryInsight?.["traducao_pratica"]) ||
+    (primaryShare > 0
+      ? `${formatPercent(primaryShare)} do valor analisado no upload.`
+      : "Peso no total ainda não calculado.");
+  const primaryConcern =
+    textOrEmpty(primaryInsight?.["por_que_preocupa"]) ||
+    "Este ponto merece leitura porque concentra valor, fornecedor ou padrão relevante na análise já salva.";
 
   if (loading) {
     return (
@@ -321,11 +353,11 @@ export default function DashboardPage() {
           <div>
             <p className="invest-eyebrow">Painel principal</p>
             <h1 className="invest-title mt-3 max-w-4xl text-3xl md:text-5xl">
-              O que precisa de explicação agora.
+              O que exige explicação agora.
             </h1>
             <p className="invest-subtitle mt-4 max-w-3xl text-base">
-              A tela usa a análise já pronta. Nenhum cálculo sensível de
-              contrato é refeito no frontend.
+              Comece pelo maior sinal de atenção do arquivo. O painel usa a
+              análise já pronta e mantém vínculo com a origem.
             </p>
           </div>
 
@@ -393,12 +425,15 @@ export default function DashboardPage() {
               <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_220px]">
                 <div>
                   <h2 className="max-w-3xl text-2xl font-black leading-tight text-[var(--invest-heading)] md:text-3xl">
-                    {primaryAlert?.title || "Nenhum alerta encontrado neste upload"}
+                    {primaryHeadline}
                   </h2>
                   <p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--invest-muted)]">
-                    {primaryAlert?.explanation ||
-                      "Quando houver alertas, o principal sinal aparecerá aqui com valor, fornecedor e motivo."}
+                    {primarySubheadline}
                   </p>
+                  <div className="mt-4 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-950">
+                    <p className="font-black">Por que isso preocupa</p>
+                    <p className="mt-1">{primaryConcern}</p>
+                  </div>
                   {primaryAlert?.supplier_name && (
                     <p className="mt-4 text-sm font-bold text-[var(--invest-heading)]">
                       Fornecedor envolvido: {primaryAlert.supplier_name}
@@ -407,14 +442,12 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="rounded-lg border border-[var(--invest-border)] bg-white p-4">
-                  <p className="metric-label">Valor em destaque</p>
+                  <p className="metric-label">Quanto isso custa</p>
                   <p className="invest-number mt-3 text-3xl font-black text-[var(--invest-heading)]">
                     {formatMoney(primaryAlertAmount)}
                   </p>
                   <p className="mt-3 text-sm text-[var(--invest-muted)]">
-                    {primaryShare > 0
-                      ? `${formatPercent(primaryShare)} do valor analisado no upload.`
-                      : "Participação não calculada."}
+                    {primaryTranslation}
                   </p>
                   {primaryAlert && (
                     <div className="mt-4">
@@ -443,28 +476,28 @@ export default function DashboardPage() {
             <MetricCard label="Valor analisado" value={formatMoney(valorTotal)} />
             <MetricCard label="Alertas deste arquivo" value={selectedAlerts.length} />
             <MetricCard
-              label="Linhas ignoradas por duplicidade"
+              label="Linhas repetidas desconsideradas"
               value={repeticoesIgnoradas.length}
             />
           </section>
 
           <section className="grid grid-cols-1 gap-6 xl:grid-cols-[0.95fr_1.05fr]">
             <div className="rounded-lg border border-[var(--invest-border)] bg-white p-6 shadow-[var(--invest-shadow-soft)]">
-              <p className="invest-eyebrow">O que foi encontrado</p>
+              <p className="invest-eyebrow">Resumo técnico</p>
               <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
-                Síntese do arquivo
+                O que a análise registrou
               </h2>
               <div className="mt-5 space-y-4 text-sm leading-7 text-[var(--invest-muted)]">
                 <p>{resumoInterpretativo || "Resumo interpretativo indisponível."}</p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div className="rounded-lg border border-[var(--invest-border)] bg-[#fbfcff] p-3">
-                    <p className="metric-label">Categoria</p>
+                    <p className="metric-label">Categoria do arquivo</p>
                     <p className="mt-1 font-black text-[var(--invest-heading)]">
                       {categoryLabel(selectedUpload.category)}
                     </p>
                   </div>
                   <div className="rounded-lg border border-[var(--invest-border)] bg-[#fbfcff] p-3">
-                    <p className="metric-label">Sinais de atenção</p>
+                    <p className="metric-label">Padrões que merecem leitura</p>
                     <p className="mt-1 font-black text-[var(--invest-heading)]">
                       {Array.isArray(repeticaoAnalitica)
                         ? repeticaoAnalitica.length
@@ -472,7 +505,7 @@ export default function DashboardPage() {
                     </p>
                   </div>
                   <div className="rounded-lg border border-[var(--invest-border)] bg-[#fbfcff] p-3">
-                    <p className="metric-label">Duplicadas ignoradas</p>
+                    <p className="metric-label">Linhas desconsideradas</p>
                     <p className="mt-1 font-black text-[var(--invest-heading)]">
                       {repeticoesIgnoradas.length}
                     </p>

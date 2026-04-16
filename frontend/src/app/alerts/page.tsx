@@ -22,7 +22,42 @@ interface AlertRecord {
   cities?: { name: string; state: string } | null;
 }
 
+interface AnalysisLog {
+  upload_id: string;
+  ai_output?: string | Record<string, unknown> | null;
+  created_at?: string | null;
+}
+
 type StatusTone = "info" | "danger" | "success" | "muted" | "warning";
+
+function parseJson(value: unknown) {
+  if (!value) return {};
+  if (typeof value === "object") return value as Record<string, unknown>;
+  try {
+    return JSON.parse(String(value)) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+function asRecordArray(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (item): item is Record<string, unknown> =>
+      Boolean(item) && typeof item === "object" && !Array.isArray(item)
+  );
+}
+
+function textOrEmpty(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeText(value: unknown) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
 
 function parseAmount(value: unknown) {
   if (value === null || value === undefined || value === "") return 0;
@@ -73,8 +108,36 @@ function severityTone(severity?: string | null): StatusTone {
   return "info";
 }
 
+function roundMoney(value: unknown) {
+  return Math.round(parseAmount(value) * 100) / 100;
+}
+
+function findInsightForAlert(
+  alert: AlertRecord,
+  insights: Record<string, unknown>[]
+) {
+  const supplier = normalizeText(alert.supplier_name);
+  const amount = roundMoney(alert.amount);
+  return (
+    insights.find((item) => {
+      const headline = normalizeText(item["headline"]);
+      const subheadline = normalizeText(item["subheadline"]);
+      const sameSupplier =
+        supplier && (headline.includes(supplier) || subheadline.includes(supplier));
+      const sameAmount =
+        amount > 0 &&
+        (normalizeText(item["headline"]).includes(String(amount).replace(".", ",")) ||
+          normalizeText(item["subheadline"]).includes(String(amount).replace(".", ",")));
+      return sameSupplier || sameAmount;
+    }) ||
+    insights[0] ||
+    null
+  );
+}
+
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState<AlertRecord[]>([]);
+  const [logs, setLogs] = useState<AnalysisLog[]>([]);
   const [severityFilter, setSeverityFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [search, setSearch] = useState("");
@@ -90,15 +153,24 @@ export default function AlertsPage() {
     setErrorMessage("");
 
     try {
-      const { data, error } = await supabase
-        .from("alerts")
-        .select("id, upload_id, city_id, category, report_type, report_label, title, explanation, severity, amount, supplier_name, created_at, cities(name, state)")
-        .order("created_at", { ascending: false })
-        .limit(500);
+      const [alertsRes, logsRes] = await Promise.all([
+        supabase
+          .from("alerts")
+          .select("id, upload_id, city_id, category, report_type, report_label, title, explanation, severity, amount, supplier_name, created_at, cities(name, state)")
+          .order("created_at", { ascending: false })
+          .limit(500),
+        supabase
+          .from("ai_analysis_logs")
+          .select("upload_id, ai_output, created_at")
+          .order("created_at", { ascending: false })
+          .limit(500),
+      ]);
 
-      if (error) throw new Error(error.message);
+      if (alertsRes.error) throw new Error(alertsRes.error.message);
+      if (logsRes.error) throw new Error(logsRes.error.message);
 
-      setAlerts((data as unknown as AlertRecord[]) || []);
+      setAlerts((alertsRes.data as unknown as AlertRecord[]) || []);
+      setLogs((logsRes.data as AnalysisLog[]) || []);
     } catch (error: unknown) {
       setErrorMessage(
         error instanceof Error ? error.message : "Falha ao carregar alertas."
@@ -138,6 +210,23 @@ export default function AlertsPage() {
     });
   }, [alerts, severityFilter, categoryFilter, search]);
 
+  const latestLogByUpload = useMemo(() => {
+    const map = new Map<string, AnalysisLog>();
+    for (const log of logs) {
+      if (!map.has(log.upload_id)) map.set(log.upload_id, log);
+    }
+    return map;
+  }, [logs]);
+
+  function insightFor(alert: AlertRecord) {
+    const log = latestLogByUpload.get(alert.upload_id);
+    const aiOutput = parseJson(log?.ai_output);
+    return findInsightForAlert(
+      alert,
+      asRecordArray(aiOutput["insights_executivos"])
+    );
+  }
+
   const highCount = alerts.filter((alert) =>
     String(alert.severity || "").toLowerCase().includes("alta")
   ).length;
@@ -172,11 +261,11 @@ export default function AlertsPage() {
           <div>
             <p className="invest-eyebrow">Fila de alertas</p>
             <h1 className="invest-title mt-3 max-w-4xl text-3xl md:text-5xl">
-              Veja primeiro o que exige explicação.
+              Alertas que merecem apuração
             </h1>
             <p className="invest-subtitle mt-4 max-w-3xl text-base">
-              Os alertas vêm da Etapa 5. Esta página organiza a leitura sem
-              afirmar crime e sem recalcular análise.
+              Comece pelos maiores valores e pelos fornecedores mais citados.
+              Cada alerta mantém vínculo com o arquivo original.
             </p>
           </div>
 
@@ -264,58 +353,68 @@ export default function AlertsPage() {
       </section>
 
       <section className="grid grid-cols-1 gap-4">
-        {filteredAlerts.map((alert) => (
-          <article
-            key={alert.id}
-            className="group grid gap-5 rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)] transition duration-200 hover:border-[rgba(49,92,255,0.32)] hover:shadow-[var(--invest-shadow)] xl:grid-cols-[180px_minmax(0,1fr)_230px]"
-          >
-            <div className="space-y-3">
-              <StatusPill tone={severityTone(alert.severity)}>
-                {alert.severity || "baixa"}
-              </StatusPill>
-              <div className="space-y-2 text-xs text-[var(--invest-muted)]">
-                <p>{categoryLabel(alert.category)}</p>
-                <p>{formatDate(alert.created_at)}</p>
-                {alert.cities?.name && (
-                  <p>
-                    {alert.cities.name}/{alert.cities.state}
-                  </p>
-                )}
+        {filteredAlerts.map((alert) => {
+          const insight = insightFor(alert);
+          const headline = textOrEmpty(insight?.["headline"]) || alert.title;
+          const reason =
+            textOrEmpty(insight?.["por_que_preocupa"]) ||
+            textOrEmpty(insight?.["subheadline"]) ||
+            alert.explanation ||
+            "Este alerta mantém vínculo com a origem e merece leitura.";
+
+          return (
+            <article
+              key={alert.id}
+              className="group grid gap-5 rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)] transition duration-200 hover:border-[rgba(49,92,255,0.32)] hover:shadow-[var(--invest-shadow)] xl:grid-cols-[180px_minmax(0,1fr)_230px]"
+            >
+              <div className="space-y-3">
+                <StatusPill tone={severityTone(alert.severity)}>
+                  {alert.severity || "baixa"}
+                </StatusPill>
+                <div className="space-y-2 text-xs text-[var(--invest-muted)]">
+                  <p>{categoryLabel(alert.category)}</p>
+                  <p>{formatDate(alert.created_at)}</p>
+                  {alert.cities?.name && (
+                    <p>
+                      {alert.cities.name}/{alert.cities.state}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div>
-              <h2 className="text-xl font-black leading-tight text-[var(--invest-heading)]">
-                {alert.title}
-              </h2>
+              <div>
+                <h2 className="text-xl font-black leading-tight text-[var(--invest-heading)]">
+                  {headline}
+                </h2>
 
-              <p className="mt-3 max-w-4xl text-sm leading-7 text-[var(--invest-muted)]">
-                {alert.explanation || "Sem explicação registrada."}
-              </p>
+                <p className="mt-3 max-w-4xl text-sm leading-7 text-[var(--invest-muted)]">
+                  {reason}
+                </p>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                <span className="app-chip">
-                  Fornecedor: {alert.supplier_name || "Não informado"}
-                </span>
-                <span className="app-chip">
-                  Documento: {alert.report_type || alert.report_label || "Não informado"}
-                </span>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <span className="app-chip">
+                    Fornecedor: {alert.supplier_name || "Não informado"}
+                  </span>
+                  <span className="app-chip">
+                    Documento: {alert.report_type || alert.report_label || "Não informado"}
+                  </span>
+                </div>
               </div>
-            </div>
 
-            <div className="flex flex-col items-start justify-between gap-4 xl:items-end">
-              <p className="invest-number text-2xl font-black text-[var(--invest-heading)]">
-                {formatMoney(parseAmount(alert.amount))}
-              </p>
-              <Link
-                href={`/alerts/${alert.id}`}
-                className="invest-button-secondary px-4 py-2 text-sm"
-              >
-                Ver detalhe
-              </Link>
-            </div>
-          </article>
-        ))}
+              <div className="flex flex-col items-start justify-between gap-4 xl:items-end">
+                <p className="invest-number text-2xl font-black text-[var(--invest-heading)]">
+                  {formatMoney(parseAmount(alert.amount))}
+                </p>
+                <Link
+                  href={`/alerts/${alert.id}`}
+                  className="invest-button-secondary px-4 py-2 text-sm"
+                >
+                  Abrir evidências
+                </Link>
+              </div>
+            </article>
+          );
+        })}
 
         {filteredAlerts.length === 0 && (
           <div className="rounded-lg border border-[var(--invest-border)] bg-white p-8 text-center text-sm text-[var(--invest-muted)]">

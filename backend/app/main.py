@@ -683,6 +683,49 @@ async def analyze_upload(upload_id: str):
         if "resumo_contextual_ia" not in parsed or not isinstance(parsed["resumo_contextual_ia"], str):
             parsed["resumo_contextual_ia"] = "Resumo contextual indisponível."
 
+        if not isinstance(parsed.get("insights_executivos", []), list):
+            parsed["insights_executivos"] = []
+
+        insights = []
+        for item in parsed.get("insights_executivos", []):
+            if not isinstance(item, dict):
+                continue
+            insights.append({
+                "tipo": str(item.get("tipo", "") or "")[:80],
+                "headline": str(item.get("headline", "") or "")[:180],
+                "subheadline": str(item.get("subheadline", "") or "")[:220],
+                "traducao_pratica": str(item.get("traducao_pratica", "") or "")[:220],
+                "por_que_preocupa": str(item.get("por_que_preocupa", "") or "")[:260],
+                "termo_explicado": str(item.get("termo_explicado", "") or "")[:220],
+                "gravidade_editorial": str(item.get("gravidade_editorial", "") or "")[:40],
+            })
+        parsed["insights_executivos"] = insights
+
+        if not isinstance(parsed.get("glossario_contextual", []), list):
+            parsed["glossario_contextual"] = []
+
+        glossario = []
+        for item in parsed.get("glossario_contextual", []):
+            if not isinstance(item, dict):
+                continue
+            glossario.append({
+                "termo": str(item.get("termo", "") or "")[:80],
+                "explicacao_curta": str(item.get("explicacao_curta", "") or "")[:220],
+            })
+        parsed["glossario_contextual"] = glossario
+
+        if not isinstance(parsed.get("creative_copy"), dict):
+            parsed["creative_copy"] = {}
+
+        creative_copy = parsed["creative_copy"]
+        parsed["creative_copy"] = {
+            "headline": str(creative_copy.get("headline", "") or "")[:120],
+            "valor_destaque": str(creative_copy.get("valor_destaque", "") or "")[:80],
+            "frase_impacto": str(creative_copy.get("frase_impacto", "") or "")[:180],
+            "cta": str(creative_copy.get("cta", "") or "")[:100],
+            "rodape": str(creative_copy.get("rodape", "") or "")[:120],
+        }
+
         parsed.pop("resumo_contextual", None)
 
         return parsed
@@ -1047,12 +1090,24 @@ async def analyze_upload(upload_id: str):
         ai_json = {
             "resumo_interpretativo": "IA desativada ou não executada.",
             "resumo_contextual_ia": "Resumo contextual indisponível ou IA não executada.",
-            "alertas": []
+            "alertas": [],
+            "insights_executivos": [],
+            "glossario_contextual": [],
+            "creative_copy": {
+                "headline": "Alerta em dado público",
+                "valor_destaque": "",
+                "frase_impacto": "Um ponto de atenção exige leitura dos dados.",
+                "cta": "Veja os dados. Peça explicações.",
+                "rodape": "Fonte: Fiscaliza.AI · dados públicos analisados",
+            },
         }
 
         if os.getenv("AI_PROVIDER", "none").lower() == "gemini" and os.getenv("GEMINI_API_KEY"):
             prompt = f"""
-Você é um assistente analítico focado em transparência pública.
+Você é o redator analítico do Fiscaliza.AI.
+
+Você transforma dados públicos em achados claros para uma pessoa leiga.
+Seu texto deve ser firme, direto e útil. Não escreva como consultoria genérica.
 
 Contexto do upload:
 - Categoria: {upload_record.get("category")}
@@ -1064,33 +1119,81 @@ Contexto do upload:
 
 Sua tarefa:
 1. Ler os números resumidos e contextuais abaixo.
-2. Identificar concentracoes relevantes, repeticoes analiticas e padroes matematicos objetivos.
-3. Escrever um resumo interpretativo curto.
-4. Gerar alertas apenas se os números justificarem.
-5. NÃO declarar fraude.
-6. NÃO inventar dados.
-7. NÃO extrapolar além do resumo fornecido.
-8. Se a categoria for contracts, NAO use linguagem de pagamento; use contrato, fornecedor e valor contratado.
-9. Se resumo_contextual.repeticoes_estruturais_ignoradas listar itens, NAO gere alerta para esses itens.
-10. resumo_contextual_ia deve ser texto curto, baseado apenas no contexto tecnico enviado, sem inventar campos e sem despejar raw_json.
-11. Para contracts, diferencie repeticao estrutural do arquivo de repeticao contratual analiticamente relevante.
+2. Apontar o fato principal na primeira frase.
+3. Traduzir números quando houver base: peso no total, custo mensal, frequência de modalidade e concentração por fornecedor.
+4. Explicar termos difíceis somente quando ajudarem o cidadão, em uma frase curta.
+5. Gerar alertas apenas se os números justificarem.
+6. Gerar insights_executivos para orientar dashboard, lista de alertas, detalhe e arte.
+
+Regras editoriais obrigatórias:
+- Vá direto ao ponto.
+- Use linguagem simples, forte e curta.
+- Evite jargão inútil e texto corporativo vazio.
+- Não repita em parágrafo o que já está evidente nos números.
+- Não declare fraude, crime, corrupção ou desvio como fato comprovado.
+- Pode usar: "exige explicação", "merece apuração", "forte sinal de alerta", "foge do esperado", "levanta suspeita plausível".
+- Não invente dados.
+- Não extrapole além do resumo fornecido.
+- Não despeje raw_json.
+- Se a categoria for contracts, use contrato, fornecedor e valor contratado. Evite linguagem de pagamento.
+- Se resumo_contextual.repeticoes_estruturais_ignoradas listar itens, não gere alerta para esses itens.
+- Para contracts, diferencie repetição estrutural do arquivo de repetição contratual analiticamente relevante.
+- Se houver inexigibilidade, explique que é contratação sem competição formal, permitida apenas em situações específicas.
+
+Como construir insights_executivos:
+- Cada insight deve responder: o que aconteceu, quanto custa, por que importa, o que torna incomum e quem está envolvido.
+- Se houver vigência suficiente, calcule custo mensal estimado.
+- Se houver valor total do upload, calcule peso aproximado no total.
+- Se houver modalidade e total de registros, calcule frequência aproximada.
+- Se faltarem dados, omita a frase derivada. Nunca invente.
+- O campo headline deve ser forte e específico.
+- O campo por_que_preocupa deve explicar por que isso merece apuração, sem afirmar crime.
+
+Como construir creative_copy:
+- Deve parecer post de rede social, não relatório.
+- Use headline curta, valor_destaque forte, frase_impacto curta, CTA direto e rodapé discreto.
+- Exemplo de CTA: "Veja os dados. Peça explicações."
 
 DADOS MATEMATICOS E CONTEXTUAIS:
 {input_summary_text}
 
 RESPONDA APENAS EM JSON VÁLIDO NESTA ESTRUTURA:
 {{
-  "resumo_interpretativo": "texto curto aqui",
-  "resumo_contextual_ia": "síntese textual curta do contexto técnico recebido",
+  "resumo_interpretativo": "síntese curta, direta e sem repetir números já evidentes",
+  "resumo_contextual_ia": "o ponto principal em linguagem simples, com por que isso exige atenção",
   "alertas": [
     {{
-      "title": "Título curto",
-      "explanation": "Explicação objetiva",
+      "title": "Título curto e forte",
+      "explanation": "Explicação objetiva, firme e responsável",
       "severity": "baixa",
       "amount": 0.0,
       "supplier_name": "Fornecedor"
     }}
-  ]
+  ],
+  "insights_executivos": [
+    {{
+      "tipo": "concentracao_fornecedor",
+      "headline": "Fornecedor concentra R$ 7,53 milhões em contratos de informática",
+      "subheadline": "Esse valor representa a maior parte do arquivo analisado.",
+      "traducao_pratica": "Cerca de R$ 627,7 mil por mês durante 12 meses.",
+      "por_que_preocupa": "Pela concentração e dimensão do gasto, isso exige explicação clara.",
+      "termo_explicado": "",
+      "gravidade_editorial": "alta"
+    }}
+  ],
+  "glossario_contextual": [
+    {{
+      "termo": "inexigibilidade",
+      "explicacao_curta": "Contratação sem competição formal, permitida apenas em situações específicas."
+    }}
+  ],
+  "creative_copy": {{
+    "headline": "R$ 7,53 milhões em contratos de informática",
+    "valor_destaque": "R$ 7,53 mi",
+    "frase_impacto": "Um único fornecedor concentra a maior parte do valor analisado.",
+    "cta": "Veja os dados. Peça explicações.",
+    "rodape": "Fonte: Fiscaliza.AI · dados públicos analisados"
+  }}
 }}
 """
             try:
@@ -1105,7 +1208,16 @@ RESPONDA APENAS EM JSON VÁLIDO NESTA ESTRUTURA:
                         f"{str(e)}"
                     ),
                     "resumo_contextual_ia": "Resumo contextual indisponível por erro na interpretação textual da IA.",
-                    "alertas": []
+                    "alertas": [],
+                    "insights_executivos": [],
+                    "glossario_contextual": [],
+                    "creative_copy": {
+                        "headline": "Alerta em dado público",
+                        "valor_destaque": "",
+                        "frase_impacto": "Um ponto de atenção exige leitura dos dados.",
+                        "cta": "Veja os dados. Peça explicações.",
+                        "rodape": "Fonte: Fiscaliza.AI · dados públicos analisados",
+                    },
                 }
 
         if is_contracts:
@@ -1121,6 +1233,23 @@ RESPONDA APENAS EM JSON VÁLIDO NESTA ESTRUTURA:
                         continue
                     alert["title"] = contract_safe_text(alert.get("title", ""))
                     alert["explanation"] = contract_safe_text(alert.get("explanation", ""))
+            if isinstance(ai_json.get("insights_executivos"), list):
+                for insight in ai_json["insights_executivos"]:
+                    if not isinstance(insight, dict):
+                        continue
+                    for key in [
+                        "headline",
+                        "subheadline",
+                        "traducao_pratica",
+                        "por_que_preocupa",
+                        "termo_explicado",
+                    ]:
+                        insight[key] = contract_safe_text(insight.get(key, ""))
+            if isinstance(ai_json.get("creative_copy"), dict):
+                for key in ["headline", "valor_destaque", "frase_impacto", "cta", "rodape"]:
+                    ai_json["creative_copy"][key] = contract_safe_text(
+                        ai_json["creative_copy"].get(key, "")
+                    )
 
         # 5. Limpa saída anterior deste upload para evitar duplicação em retry
         supabase.table("alerts").delete().eq("upload_id", upload_id).execute()
@@ -1340,40 +1469,59 @@ def creative_extract_json(text):
 
 
 def creative_normalize_output(parsed, fallback_context):
+    creative_copy = fallback_context.get("creative_copy")
+    if not isinstance(creative_copy, dict):
+        creative_copy = {}
+
     title = creative_text(
         parsed.get("title"),
-        f"Alerta em {creative_text(fallback_context.get('category_label'), 'dado público')}",
+        creative_text(
+            creative_copy.get("headline"),
+            f"Alerta em {creative_text(fallback_context.get('category_label'), 'dado público')}",
+        ),
     )
 
     subtitle = creative_text(
         parsed.get("subtitle"),
-        creative_text(fallback_context.get("alert_title"), "Ponto de atenção identificado"),
+        creative_text(
+            creative_copy.get("valor_destaque"),
+            creative_text(fallback_context.get("amount"), "Ponto de atenção identificado"),
+        ),
     )
 
     body = creative_text(
         parsed.get("body"),
         creative_text(
-            fallback_context.get("alert_explanation"),
-            "Um alerta foi identificado a partir dos dados analisados."
+            creative_copy.get("frase_impacto"),
+            creative_text(
+                fallback_context.get("alert_explanation"),
+                "Um alerta foi identificado a partir dos dados analisados."
+            ),
         ),
     )
 
     cta = creative_text(
         parsed.get("cta"),
-        "Confira os dados e acompanhe a fiscalização.",
+        creative_text(
+            creative_copy.get("cta"),
+            "Veja os dados. Peça explicações.",
+        ),
     )
 
     footer = creative_text(
         parsed.get("footer"),
-        "Fonte: dados públicos analisados pelo Fiscaliza.AI",
+        creative_text(
+            creative_copy.get("rodape"),
+            "Fonte: dados públicos analisados pelo Fiscaliza.AI",
+        ),
     )
 
     return {
         "title": title[:90],
-        "subtitle": subtitle[:140],
-        "body": body[:260],
-        "cta": cta[:120],
-        "footer": footer[:140],
+        "subtitle": subtitle[:90],
+        "body": body[:180],
+        "cta": cta[:90],
+        "footer": footer[:120],
     }
 
 
@@ -1428,6 +1576,9 @@ def generate_creative(alert_id: str):
         input_summary = creative_parse_json(analysis_log.get("input_summary"))
         ai_output = creative_parse_json(analysis_log.get("ai_output"))
         resumo_contextual = creative_parse_json(input_summary.get("resumo_contextual"))
+        creative_copy = ai_output.get("creative_copy")
+        if not isinstance(creative_copy, dict):
+            creative_copy = {}
 
         related_record = None
         source_record_id = alert_record.get("source_record_id")
@@ -1491,6 +1642,7 @@ def generate_creative(alert_id: str):
             "upload_file_name": upload_record.get("file_name"),
             "resumo_interpretativo": ai_output.get("resumo_interpretativo"),
             "resumo_contextual_ia": ai_output.get("resumo_contextual_ia"),
+            "creative_copy": creative_copy,
             "tipo_contexto": resumo_contextual.get("tipo_contexto"),
             "raw_fields": raw_fields,
         }
@@ -1500,14 +1652,14 @@ def generate_creative(alert_id: str):
 
         if os.getenv("AI_PROVIDER", "none").lower() == "gemini" and os.getenv("GEMINI_API_KEY"):
             prompt = f"""
-Você é um assistente de comunicação pública do Fiscaliza.AI.
+Você é um editor de post social do Fiscaliza.AI.
 
-Sua tarefa é transformar um alerta técnico em texto curto para uma arte informativa.
+Sua tarefa é transformar um alerta técnico em uma peça curta, forte e rastreável.
 
 REGRAS OBRIGATÓRIAS:
-- Não declare fraude.
-- Não acuse pessoas ou empresas.
-- Use linguagem responsável: "alerta", "ponto de atenção", "indício", "merece verificação".
+- Não declare fraude, crime, corrupção ou desvio como fato comprovado.
+- Não acuse pessoas ou empresas sem prova.
+- Use linguagem responsável e firme: "exige explicação", "merece apuração", "forte sinal de alerta", "levanta suspeita plausível".
 - Não invente dados.
 - Use apenas o contexto enviado.
 - Não despeje raw_json.
@@ -1515,7 +1667,8 @@ REGRAS OBRIGATÓRIAS:
 - Seja claro para cidadão comum.
 - Se a categoria for contracts, use linguagem de contrato, fornecedor e valor contratado.
 - Evite linguagem de pagamento para contracts.
-- O texto deve caber em uma arte vertical simples.
+- A arte deve parecer post de rede social, não documento técnico.
+- Priorize: headline forte, valor em destaque, frase curta de impacto, CTA curto e rodapé discreto.
 - Responda apenas em JSON válido.
 
 CONTEXTO DO ALERTA:
@@ -1523,11 +1676,11 @@ CONTEXTO DO ALERTA:
 
 FORMATO OBRIGATÓRIO:
 {{
-  "title": "título curto, forte e responsável",
-  "subtitle": "subtítulo objetivo",
-  "body": "texto curto explicando o ponto de atenção",
-  "cta": "chamada curta para acompanhamento público",
-  "footer": "fonte curta e rastreável"
+  "title": "headline curta e forte",
+  "subtitle": "valor principal em destaque, se existir",
+  "body": "frase curta de impacto explicando por que merece atenção",
+  "cta": "Veja os dados. Peça explicações.",
+  "footer": "Fonte: Fiscaliza.AI · dados públicos analisados"
 }}
 """
             model = genai.GenerativeModel(GEMINI_MODEL)

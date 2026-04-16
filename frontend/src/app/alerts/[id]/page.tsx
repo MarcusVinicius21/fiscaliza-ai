@@ -162,6 +162,10 @@ function displayValue(value: unknown) {
   return String(value);
 }
 
+function textOrEmpty(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 function getRawDict(record: StandardizedRecord | null): JsonObject {
   if (!record) return {};
   return parseJson(record.raw_json);
@@ -230,6 +234,32 @@ function findMatchingAiAlert(alert: AlertRecord | null, aiAlerts: JsonObject[]) 
 
       return sameTitle || sameSupplierAndAmount;
     }) || null
+  );
+}
+
+function findMatchingExecutiveInsight(
+  alert: AlertRecord | null,
+  insights: JsonObject[]
+) {
+  if (!alert) return null;
+
+  const supplier = normalizeText(alert.supplier_name);
+  const amount = roundMoney(alert.amount);
+
+  return (
+    insights.find((item) => {
+      const headline = normalizeText(item.headline);
+      const subheadline = normalizeText(item.subheadline);
+      const sameSupplier =
+        supplier && (headline.includes(supplier) || subheadline.includes(supplier));
+      const sameAmount =
+        amount > 0 &&
+        (headline.includes(String(amount).replace(".", ",")) ||
+          subheadline.includes(String(amount).replace(".", ",")));
+      return sameSupplier || sameAmount;
+    }) ||
+    insights[0] ||
+    null
   );
 }
 
@@ -457,6 +487,9 @@ export default function AlertDetailPage() {
 
   const aiAlerts = asRecordArray(aiOutput["alertas"]);
   const matchedAiAlert = findMatchingAiAlert(alert, aiAlerts);
+  const insightsExecutivos = asRecordArray(aiOutput["insights_executivos"]);
+  const matchedInsight = findMatchingExecutiveInsight(alert, insightsExecutivos);
+  const glossarioContextual = asRecordArray(aiOutput["glossario_contextual"]);
 
   const firstRecord = records[0] || null;
   const rawEntries = rawPreviewEntries(firstRecord);
@@ -487,6 +520,25 @@ export default function AlertDetailPage() {
   const repeatedContext =
     asRecordArray(inputSummary["alerta_potencial_repeticao_contratual"]).length ||
     asRecordArray(inputSummary["alerta_potencial_duplicidade"]).length;
+  const executiveHeadline =
+    textOrEmpty(matchedInsight?.headline) || alert?.title || "Alerta sem título";
+  const executiveSubheadline =
+    textOrEmpty(matchedInsight?.subheadline) ||
+    alert?.explanation ||
+    "Este alerta merece leitura porque mantém vínculo com os dados de origem.";
+  const practicalTranslation =
+    textOrEmpty(matchedInsight?.traducao_pratica) ||
+    (monthlyEstimate > 0
+      ? `${formatMoney(monthlyEstimate)} por mês em uma vigência estimada de ${months} meses.`
+      : percentOfUpload > 0
+        ? `${formatPercent(percentOfUpload)} do total analisado neste upload.`
+        : "");
+  const concernCopy =
+    textOrEmpty(matchedInsight?.por_que_preocupa) ||
+    "O dado concentra valor ou padrão relevante e exige explicação antes de qualquer conclusão.";
+  const termExplained =
+    textOrEmpty(matchedInsight?.termo_explicado) ||
+    textOrEmpty(glossarioContextual[0]?.explicacao_curta);
 
   if (loading) {
     return (
@@ -547,13 +599,13 @@ export default function AlertDetailPage() {
               <span className="app-chip">{formatDate(alert.created_at)}</span>
             </div>
 
-            <p className="invest-eyebrow mt-6">O que foi encontrado</p>
+            <p className="invest-eyebrow mt-6">O que exige explicação</p>
             <h1 className="invest-title mt-3 max-w-4xl text-3xl md:text-5xl">
-              {alert.title}
+              {executiveHeadline}
             </h1>
 
             <p className="invest-subtitle mt-4 max-w-3xl text-base">
-              {alert.explanation || "Sem explicação registrada."}
+              {executiveSubheadline}
             </p>
           </div>
 
@@ -612,13 +664,16 @@ export default function AlertDetailPage() {
         <article className="evidence-card p-6">
           <p className="invest-eyebrow">Por que isso preocupa</p>
           <h2 className="mt-2 text-2xl font-black text-[var(--invest-heading)]">
-            O valor representa {formatPercent(percentOfUpload)} do total analisado.
+            {practicalTranslation ||
+              `O valor representa ${formatPercent(percentOfUpload)} do total analisado.`}
           </h2>
           <div className="mt-5 space-y-3 text-sm leading-7 text-[var(--invest-muted)]">
-            <p>
-              Este alerta merece apuração porque concentra valor relevante em
-              uma linha, fornecedor ou padrão identificado na análise já salva.
-            </p>
+            <p>{concernCopy}</p>
+            {termExplained && (
+              <p className="rounded-lg border border-orange-200 bg-white p-3 text-orange-950">
+                {termExplained}
+              </p>
+            )}
             <p>
               A tela não afirma crime. Ela mostra por que o dado exige
               explicação e onde conferir a origem.
@@ -659,7 +714,7 @@ export default function AlertDetailPage() {
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <div className="rounded-lg border border-[var(--invest-border)] bg-white p-6 shadow-[var(--invest-shadow-soft)]">
-          <p className="invest-eyebrow">Origem</p>
+          <p className="invest-eyebrow">Quem está envolvido</p>
           <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
             Arquivo que gerou o alerta
           </h2>
@@ -705,7 +760,7 @@ export default function AlertDetailPage() {
           <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
             <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
               <p className="text-xs font-black uppercase tracking-[0.12em] text-blue-700">
-                O que chama atenção
+                O que exige explicação
               </p>
               <p className="mt-3 text-sm leading-7 text-blue-950">
                 {displayValue(aiOutput["resumo_contextual_ia"])}
@@ -714,7 +769,7 @@ export default function AlertDetailPage() {
 
             <div className="rounded-lg border border-[var(--invest-border)] bg-[#fbfcff] p-4">
               <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
-                Resumo da análise
+                Síntese sem repetir os números
               </p>
               <p className="mt-3 text-sm leading-7 text-[var(--invest-muted)]">
                 {displayValue(aiOutput["resumo_interpretativo"])}
@@ -740,10 +795,10 @@ export default function AlertDetailPage() {
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <div className="rounded-lg border border-[var(--invest-border)] bg-white p-6 shadow-[var(--invest-shadow-soft)]">
-          <p className="invest-eyebrow">Sinais de atenção</p>
-          <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
-            Por que apareceu na análise
-          </h2>
+              <p className="invest-eyebrow">Motivo do alerta</p>
+              <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
+                Por que apareceu na análise
+              </h2>
 
           <div className="mt-5 space-y-4 text-sm leading-6 text-[var(--invest-muted)]">
             <p>
@@ -806,7 +861,7 @@ export default function AlertDetailPage() {
       </section>
 
       <section className="rounded-lg border border-[var(--invest-border)] bg-white p-6 shadow-[var(--invest-shadow-soft)]">
-        <p className="invest-eyebrow">Provas e origem</p>
+        <p className="invest-eyebrow">Provas de origem</p>
         <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
           Dados preservados do arquivo
         </h2>
@@ -839,7 +894,7 @@ export default function AlertDetailPage() {
         {firstRecord && (
           <details className="mt-5 rounded-lg border border-[var(--invest-border)] bg-[#fbfcff] p-4">
             <summary className="font-bold text-[var(--invest-heading)]">
-              Ver raw_json completo do primeiro registro relacionado
+              Ver dados brutos do primeiro registro relacionado
             </summary>
             <pre className="invest-soft-scroll mt-4 max-h-[520px] overflow-auto rounded-lg border border-[var(--invest-border)] bg-white p-4 text-xs leading-5 text-[var(--invest-text)]">
               {JSON.stringify(getRawDict(firstRecord), null, 2)}

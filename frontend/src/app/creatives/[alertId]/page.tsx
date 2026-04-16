@@ -145,164 +145,129 @@ function drawCreative(canvas: HTMLCanvasElement, data: CreativeResponse) {
   canvas.width = width;
   canvas.height = height;
 
-  ctx.fillStyle = "#f5f7fb";
+  const valueText =
+    data.creative.subtitle && data.creative.subtitle !== "Não informado"
+      ? data.creative.subtitle
+      : formatMoney(data.source.alert?.amount);
+
+  ctx.fillStyle = "#f4f7fb";
   ctx.fillRect(0, 0, width, height);
 
   ctx.fillStyle = "#ffffff";
-  ctx.fillRect(54, 54, width - 108, height - 108);
-  ctx.strokeStyle = "#dbe3ef";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(54, 54, width - 108, height - 108);
+  ctx.beginPath();
+  ctx.roundRect(54, 54, width - 108, height - 108, 32);
+  ctx.fill();
 
-  ctx.fillStyle = accent;
-  ctx.fillRect(54, 54, width - 108, 14);
+  ctx.fillStyle = "#07111f";
+  ctx.beginPath();
+  ctx.roundRect(78, 78, width - 156, 118, 24);
+  ctx.fill();
 
-  ctx.fillStyle = "#111827";
+  ctx.fillStyle = "#ffffff";
   ctx.font = "800 34px Arial";
-  ctx.fillText("Fiscaliza.AI", margin, 126);
+  ctx.fillText("Fiscaliza.AI", margin + 18, 132);
 
-  ctx.fillStyle = "#667085";
-  ctx.font = "400 24px Arial";
-  ctx.fillText("Dados públicos em linguagem simples", margin, 168);
-
-  ctx.fillStyle = "#f8fafc";
-  ctx.fillRect(margin, 220, 260, 62);
-  ctx.strokeStyle = "#dbe3ef";
-  ctx.strokeRect(margin, 220, 260, 62);
+  ctx.fillStyle = "#cbd5e1";
+  ctx.font = "400 23px Arial";
+  ctx.fillText("Dados públicos em linguagem simples", margin + 18, 166);
 
   ctx.fillStyle = accent;
-  ctx.font = "800 24px Arial";
-  ctx.fillText(
-    `Alerta ${severityLabel(data.source.alert?.severity)}`,
-    margin + 24,
-    260
-  );
+  ctx.beginPath();
+  ctx.roundRect(width - 326, 108, 210, 48, 24);
+  ctx.fill();
 
-  ctx.fillStyle = "#070b18";
-  ctx.font = "800 62px Arial";
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "800 22px Arial";
+  ctx.fillText(`Alerta ${severityLabel(data.source.alert?.severity)}`, width - 292, 139);
+
+  ctx.fillStyle = "#07111f";
+  ctx.font = "800 66px Arial";
   let currentY = drawWrappedText(
     ctx,
     data.creative.title,
     margin,
-    386,
+    318,
     width - margin * 2,
-    70,
+    74,
     3
   );
 
-  currentY += 34;
-
-  ctx.fillStyle = "#344054";
-  ctx.font = "400 34px Arial";
-  currentY = drawWrappedText(
-    ctx,
-    data.creative.subtitle,
-    margin,
-    currentY,
-    width - margin * 2,
-    45,
-    3
-  );
-
-  currentY += 58;
+  currentY += 64;
 
   ctx.fillStyle = accent;
-  ctx.font = "800 48px Arial";
-  ctx.fillText(formatMoney(data.source.alert?.amount), margin, currentY);
-
-  currentY += 62;
-
-  ctx.fillStyle = "#667085";
-  ctx.font = "400 28px Arial";
+  ctx.font = "900 92px Arial";
   currentY = drawWrappedText(
     ctx,
-    `Fornecedor: ${normalizeLabel(data.source.alert?.supplier_name)}`,
+    valueText,
     margin,
     currentY,
     width - margin * 2,
-    38,
+    96,
     2
   );
 
-  currentY += 66;
+  currentY += 54;
 
-  ctx.fillStyle = "#111827";
-  ctx.font = "400 32px Arial";
+  ctx.fillStyle = "#1f2937";
+  ctx.font = "700 36px Arial";
   currentY = drawWrappedText(
     ctx,
     data.creative.body,
     margin,
     currentY,
     width - margin * 2,
-    45,
-    5
+    48,
+    4
   );
 
   currentY += 58;
 
-  ctx.strokeStyle = "#e3e8f2";
+  ctx.fillStyle = "#f8fafc";
   ctx.beginPath();
-  ctx.moveTo(margin, currentY);
-  ctx.lineTo(width - margin, currentY);
+  ctx.roundRect(margin, currentY, width - margin * 2, 150, 22);
+  ctx.fill();
+  ctx.strokeStyle = "#dbe3ef";
   ctx.stroke();
 
-  currentY += 54;
-
-  ctx.fillStyle = "#070b18";
-  ctx.font = "800 29px Arial";
-  ctx.fillText("Origem do dado", margin, currentY);
-
-  currentY += 46;
-
-  ctx.fillStyle = "#667085";
-  ctx.font = "400 25px Arial";
-  ctx.fillText(
-    `Categoria: ${normalizeLabel(data.source.upload?.category_label)}`,
-    margin,
-    currentY
-  );
-
-  currentY += 38;
-  ctx.fillText(
-    `Tipo: ${normalizeLabel(
-      data.source.upload?.report_type || data.source.upload?.report_label
-    )}`,
-    margin,
-    currentY
-  );
-
-  currentY += 38;
+  ctx.fillStyle = "#475467";
+  ctx.font = "700 24px Arial";
   drawWrappedText(
     ctx,
-    `Arquivo: ${normalizeLabel(data.source.upload?.file_name)}`,
-    margin,
-    currentY,
-    width - margin * 2,
+    `Fornecedor: ${normalizeLabel(data.source.alert?.supplier_name)}`,
+    margin + 28,
+    currentY + 54,
+    width - margin * 2 - 56,
     34,
     2
   );
 
-  ctx.fillStyle = "#111827";
-  ctx.fillRect(margin, height - 214, width - margin * 2, 88);
+  ctx.fillStyle = "#07111f";
+  ctx.beginPath();
+  ctx.roundRect(margin, height - 254, width - margin * 2, 96, 24);
+  ctx.fill();
 
   ctx.fillStyle = "#ffffff";
-  ctx.font = "800 28px Arial";
+  ctx.font = "900 32px Arial";
   drawWrappedText(
     ctx,
     data.creative.cta,
-    margin + 30,
-    height - 160,
-    width - margin * 2 - 60,
-    34,
+    margin + 34,
+    height - 194,
+    width - margin * 2 - 68,
+    38,
     2
   );
 
   ctx.fillStyle = "#667085";
   ctx.font = "400 22px Arial";
-  ctx.fillText(
-    `${data.creative.footer} - Alerta ${data.alert_id.slice(0, 8)}`,
+  drawWrappedText(
+    ctx,
+    `${data.creative.footer} · Alerta ${data.alert_id.slice(0, 8)}`,
     margin,
-    height - 78
+    height - 86,
+    width - margin * 2,
+    28,
+    2
   );
 }
 
@@ -382,20 +347,20 @@ export default function CreativeByAlertPage() {
           <div>
             <p className="invest-eyebrow">Arte do alerta</p>
             <h1 className="invest-title mt-3 max-w-4xl text-3xl md:text-5xl">
-              Gere uma peça clara, forte e rastreável.
+              Gere um post direto, forte e rastreável.
             </h1>
             <p className="invest-subtitle mt-4 max-w-3xl text-base">
-              A IA sugere texto. O canvas monta a arte localmente e o PNG não é
-              salvo no banco.
+              A arte prioriza headline, valor, frase de impacto e fonte discreta.
+              O PNG é gerado localmente e não é salvo no banco.
             </p>
           </div>
 
           <div className="rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)]">
             <p className="invest-eyebrow">Passos</p>
             <div className="mt-4 space-y-3 text-sm text-[var(--invest-muted)]">
-              <p>1. Gerar texto pelo backend.</p>
-              <p>2. Revisar a prévia.</p>
-              <p>3. Baixar PNG com origem visível.</p>
+              <p>1. Gerar copy pelo backend.</p>
+              <p>2. Conferir o post.</p>
+              <p>3. Baixar PNG com rastreabilidade.</p>
             </div>
           </div>
         </div>
@@ -406,7 +371,7 @@ export default function CreativeByAlertPage() {
           <div>
             <p className="invest-eyebrow">Workspace</p>
             <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
-              Prévia da peça
+              Prévia do post
             </h2>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -439,7 +404,7 @@ export default function CreativeByAlertPage() {
         {!creativeData && !errorMessage && (
           <div className="mt-5 rounded-lg border border-[var(--invest-border)] bg-[#fbfcff] p-5 text-sm leading-6 text-[var(--invest-muted)]">
             Clique em <strong className="text-[var(--invest-heading)]">Gerar arte</strong> para
-            montar uma peça vertical com título, valor, origem e chamada pública.
+            montar uma peça vertical com headline, valor grande e chamada pública.
           </div>
         )}
 
@@ -474,7 +439,7 @@ export default function CreativeByAlertPage() {
                     {creativeData.creative.title}
                   </p>
                   <p>
-                    <strong className="text-[var(--invest-heading)]">Subtítulo:</strong>{" "}
+                    <strong className="text-[var(--invest-heading)]">Valor destaque:</strong>{" "}
                     {creativeData.creative.subtitle}
                   </p>
                   <p>
