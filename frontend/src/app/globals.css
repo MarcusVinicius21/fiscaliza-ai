@@ -1,6 +1,124 @@
 @import "tailwindcss";
 
-html, body {
+:root {
+  --invest-bg: #0c111f;
+  --invest-card: #141b2d;
+  --invest-border: #2d3748;
+  --invest-text: #ffffff;
+  --invest-muted: #cbd5e1;
+  --invest-danger: #e63946;
+  --invest-info: #4ea8de;
+  --invest-success: #10b981;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
   margin: 0;
   padding: 0;
+  min-height: 100%;
+  background: var(--invest-bg);
+  color: var(--invest-text);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.invest-card {
+  background: var(--invest-card);
+  border: 1px solid var(--invest-border);
+  border-radius: 8px;
+}
+
+.invest-muted {
+  color: var(--invest-muted);
+}
+
+.invest-number {
+  font-variant-numeric: tabular-nums;
+}
+
+.invest-soft-scroll {
+  scrollbar-color: var(--invest-border) transparent;
+  scrollbar-width: thin;
+}
+
+.invest-soft-scroll::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.invest-soft-scroll::-webkit-scrollbar-thumb {
+  background: var(--invest-border);
+  border-radius: 8px;
+}
+
+.invest-input {
+  background: #0f172a;
+  border: 1px solid var(--invest-border);
+  border-radius: 8px;
+  color: var(--invest-text);
+  outline: none;
+}
+
+.invest-input:focus {
+  border-color: var(--invest-info);
+  box-shadow: 0 0 0 2px rgba(78, 168, 222, 0.18);
+}
+
+.invest-input::placeholder {
+  color: #94a3b8;
+}
+
+.fiscaliza-shell .bg-white,
+.fiscaliza-shell .bg-gray-50,
+.fiscaliza-shell .bg-gray-100 {
+  background-color: var(--invest-card);
+}
+
+.fiscaliza-shell .text-gray-900,
+.fiscaliza-shell .text-gray-800 {
+  color: var(--invest-text);
+}
+
+.fiscaliza-shell .text-gray-700,
+.fiscaliza-shell .text-gray-600,
+.fiscaliza-shell .text-gray-500,
+.fiscaliza-shell .text-gray-400 {
+  color: var(--invest-muted);
+}
+
+.fiscaliza-shell .border,
+.fiscaliza-shell .border-b,
+.fiscaliza-shell .border-r,
+.fiscaliza-shell .border-t {
+  border-color: var(--invest-border);
+}
+
+.fiscaliza-shell input,
+.fiscaliza-shell select,
+.fiscaliza-shell textarea {
+  background-color: #0f172a;
+  border-color: var(--invest-border);
+  color: var(--invest-text);
+}
+
+.fiscaliza-shell input::placeholder,
+.fiscaliza-shell textarea::placeholder {
+  color: #94a3b8;
+}
+
+.fiscaliza-shell table {
+  color: var(--invest-text);
+}
+
+.fiscaliza-shell tr:hover {
+  background-color: rgba(78, 168, 222, 0.08);
 }
