@@ -22,6 +22,8 @@ interface AlertRecord {
   cities?: { name: string; state: string } | null;
 }
 
+type StatusTone = "info" | "danger" | "success" | "muted" | "warning";
+
 function parseAmount(value: unknown) {
   if (value === null || value === undefined || value === "") return 0;
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -44,9 +46,9 @@ function formatMoney(value: number) {
 }
 
 function formatDate(value?: string | null) {
-  if (!value) return "—";
+  if (!value) return "-";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleDateString("pt-BR");
 }
 
@@ -62,7 +64,7 @@ function categoryLabel(value: string | null | undefined) {
   return map[String(value || "")] || String(value || "Não informado");
 }
 
-function severityTone(severity?: string | null) {
+function severityTone(severity?: string | null): StatusTone {
   const sev = String(severity || "").toLowerCase();
 
   if (sev.includes("alta")) return "danger";
@@ -140,12 +142,21 @@ export default function AlertsPage() {
     String(alert.severity || "").toLowerCase().includes("alta")
   ).length;
 
+  const totalAmount = alerts.reduce(
+    (sum, alert) => sum + parseAmount(alert.amount),
+    0
+  );
+
+  const topAlert = filteredAlerts
+    .slice()
+    .sort((a, b) => parseAmount(b.amount) - parseAmount(a.amount))[0];
+
   if (loading) {
     return (
-      <div className="invest-page">
-        <section className="invest-page-hero p-6">
-          <p className="invest-eyebrow">Evidências</p>
-          <h1 className="invest-title mt-3 text-3xl">Carregando alertas</h1>
+      <div className="page-shell">
+        <section className="page-header p-6">
+          <p className="invest-eyebrow">Alertas</p>
+          <h1 className="invest-title mt-3 text-3xl">Carregando sinais</h1>
           <div className="mt-6 max-w-xl">
             <SkeletonBlock lines={4} />
           </div>
@@ -155,105 +166,108 @@ export default function AlertsPage() {
   }
 
   return (
-    <div className="invest-page">
-      <section className="invest-page-hero p-6 md:p-8">
+    <div className="page-shell">
+      <section className="page-header p-6 md:p-8">
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_440px]">
           <div>
-            <p className="invest-eyebrow">Fila de evidências</p>
+            <p className="invest-eyebrow">Fila de alertas</p>
             <h1 className="invest-title mt-3 max-w-4xl text-3xl md:text-5xl">
-              Alertas técnicos com leitura responsável.
+              Veja primeiro o que exige explicação.
             </h1>
             <p className="invest-subtitle mt-4 max-w-3xl text-base">
-              Filtre os pontos de atenção gerados pela Etapa 5 e avance para o
-              detalhe quando precisar de origem, contexto e dados brutos.
+              Os alertas vêm da Etapa 5. Esta página organiza a leitura sem
+              afirmar crime e sem recalcular análise.
             </p>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
-            <div className="invest-kpi">
-              <p className="text-xs font-bold text-[var(--invest-muted)]">
-                Total
-              </p>
-              <p className="invest-number mt-2 text-3xl font-black text-white">
-                {alerts.length}
-              </p>
+            <div className="metric-card">
+              <p className="metric-label">Total</p>
+              <p className="metric-value mt-3">{alerts.length}</p>
             </div>
-            <div className="invest-kpi">
-              <p className="text-xs font-bold text-[var(--invest-muted)]">
-                Filtrados
-              </p>
-              <p className="invest-number mt-2 text-3xl font-black text-white">
-                {filteredAlerts.length}
-              </p>
+            <div className="metric-card">
+              <p className="metric-label">Filtrados</p>
+              <p className="metric-value mt-3">{filteredAlerts.length}</p>
             </div>
-            <div className="invest-kpi">
-              <p className="text-xs font-bold text-[var(--invest-muted)]">
-                Alta
-              </p>
-              <p className="invest-number mt-2 text-3xl font-black text-white">
-                {highCount}
-              </p>
+            <div className="metric-card">
+              <p className="metric-label">Alta</p>
+              <p className="metric-value mt-3">{highCount}</p>
             </div>
           </div>
         </div>
       </section>
 
       {errorMessage && (
-        <div className="rounded-lg border border-[rgba(230,57,70,0.4)] bg-[rgba(230,57,70,0.1)] p-4 text-sm text-[#ffb4ba]">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {errorMessage}
         </div>
       )}
 
-      <section className="invest-card p-4">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px]">
-          <div>
-            <label className="invest-label">Busca textual</label>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por título, explicação ou fornecedor"
-              className="invest-input"
-            />
-          </div>
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="rounded-lg border border-[var(--invest-border)] bg-white p-4 shadow-[var(--invest-shadow-soft)]">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px]">
+            <div>
+              <label className="invest-label">Buscar</label>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Título, explicação ou fornecedor"
+                className="invest-input"
+              />
+            </div>
 
-          <div>
-            <label className="invest-label">Severidade</label>
-            <select
-              value={severityFilter}
-              onChange={(e) => setSeverityFilter(e.target.value)}
-              className="invest-select"
-            >
-              <option value="">Todas as severidades</option>
-              <option value="alta">Alta</option>
-              <option value="media">Média</option>
-              <option value="baixa">Baixa</option>
-            </select>
-          </div>
+            <div>
+              <label className="invest-label">Severidade</label>
+              <select
+                value={severityFilter}
+                onChange={(e) => setSeverityFilter(e.target.value)}
+                className="invest-select"
+              >
+                <option value="">Todas</option>
+                <option value="alta">Alta</option>
+                <option value="media">Média</option>
+                <option value="baixa">Baixa</option>
+              </select>
+            </div>
 
-          <div>
-            <label className="invest-label">Categoria</label>
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="invest-select"
-            >
-              <option value="">Todas as categorias</option>
-              {categories.map((item) => (
-                <option key={item} value={item}>
-                  {categoryLabel(item)}
-                </option>
-              ))}
-            </select>
+            <div>
+              <label className="invest-label">Categoria</label>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="invest-select"
+              >
+                <option value="">Todas</option>
+                {categories.map((item) => (
+                  <option key={item} value={item}>
+                    {categoryLabel(item)}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
+
+        <aside className="rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)]">
+          <p className="invest-eyebrow">Maior valor filtrado</p>
+          <h2 className="mt-2 text-lg font-black text-[var(--invest-heading)]">
+            {topAlert?.title || "Nenhum alerta no filtro"}
+          </h2>
+          <p className="invest-number mt-4 text-3xl font-black text-[var(--invest-heading)]">
+            {formatMoney(parseAmount(topAlert?.amount))}
+          </p>
+          <p className="mt-3 text-sm text-[var(--invest-muted)]">
+            Total bruto nos alertas carregados: {formatMoney(totalAmount)}.
+          </p>
+        </aside>
       </section>
 
       <section className="grid grid-cols-1 gap-4">
         {filteredAlerts.map((alert) => (
           <article
             key={alert.id}
-            className="group grid gap-5 rounded-lg border border-[var(--invest-border)] bg-[rgba(16,24,39,0.72)] p-5 shadow-[0_16px_42px_rgba(0,0,0,0.2)] transition duration-200 hover:border-[rgba(125,211,252,0.42)] hover:bg-[rgba(19,30,47,0.88)] xl:grid-cols-[180px_minmax(0,1fr)_220px]"
+            className="group grid gap-5 rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)] transition duration-200 hover:border-[rgba(49,92,255,0.32)] hover:shadow-[var(--invest-shadow)] xl:grid-cols-[180px_minmax(0,1fr)_230px]"
           >
             <div className="space-y-3">
               <StatusPill tone={severityTone(alert.severity)}>
@@ -271,7 +285,7 @@ export default function AlertsPage() {
             </div>
 
             <div>
-              <h2 className="text-xl font-black leading-tight text-white">
+              <h2 className="text-xl font-black leading-tight text-[var(--invest-heading)]">
                 {alert.title}
               </h2>
 
@@ -280,17 +294,17 @@ export default function AlertsPage() {
               </p>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                <span className="invest-chip">
+                <span className="app-chip">
                   Fornecedor: {alert.supplier_name || "Não informado"}
                 </span>
-                <span className="invest-chip">
-                  Relatório: {alert.report_type || alert.report_label || "Não informado"}
+                <span className="app-chip">
+                  Documento: {alert.report_type || alert.report_label || "Não informado"}
                 </span>
               </div>
             </div>
 
             <div className="flex flex-col items-start justify-between gap-4 xl:items-end">
-              <p className="invest-number text-2xl font-black text-white">
+              <p className="invest-number text-2xl font-black text-[var(--invest-heading)]">
                 {formatMoney(parseAmount(alert.amount))}
               </p>
               <Link
@@ -304,7 +318,7 @@ export default function AlertsPage() {
         ))}
 
         {filteredAlerts.length === 0 && (
-          <div className="invest-card p-8 text-center text-sm text-[var(--invest-muted)]">
+          <div className="rounded-lg border border-[var(--invest-border)] bg-white p-8 text-center text-sm text-[var(--invest-muted)]">
             Nenhum alerta encontrado para os filtros atuais.
           </div>
         )}

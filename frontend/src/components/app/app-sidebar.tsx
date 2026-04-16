@@ -5,24 +5,24 @@ import { usePathname } from "next/navigation";
 
 const navGroups = [
   {
-    title: "Operação",
+    title: "Investigar",
     items: [
-      { href: "/dashboard", label: "Dashboard", description: "Sala executiva" },
-      { href: "/uploads", label: "Uploads", description: "Entrada de dados" },
-      { href: "/alerts", label: "Alertas", description: "Indícios e evidências" },
+      { href: "/dashboard", label: "Dashboard", description: "Visão geral", mark: "D" },
+      { href: "/uploads", label: "Uploads", description: "Importar dados", mark: "U" },
+      { href: "/alerts", label: "Alertas", description: "O que exige atenção", mark: "A" },
     ],
   },
   {
-    title: "Comunicação",
+    title: "Comunicar",
     items: [
-      { href: "/creatives", label: "Artes", description: "Peças públicas" },
+      { href: "/creatives", label: "Artes", description: "Peças públicas", mark: "P" },
     ],
   },
   {
-    title: "Base local",
+    title: "Organizar",
     items: [
-      { href: "/clients", label: "Clientes", description: "Gestão institucional" },
-      { href: "/cities", label: "Cidades", description: "Territórios monitorados" },
+      { href: "/clients", label: "Clientes", description: "Responsáveis", mark: "C" },
+      { href: "/cities", label: "Cidades", description: "Bases monitoradas", mark: "M" },
     ],
   },
 ];
@@ -31,31 +31,23 @@ export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden w-80 shrink-0 border-r border-[var(--invest-border)] bg-[#060a12]/88 px-5 py-5 shadow-[24px_0_70px_rgba(0,0,0,0.24)] backdrop-blur-xl lg:flex lg:min-h-dvh lg:flex-col">
-      <Link href="/dashboard" className="group block rounded-lg border border-[var(--invest-border)] bg-[#0d1524]/82 p-4 transition hover:border-[var(--invest-border-strong)]">
-        <p className="invest-eyebrow">Fiscaliza.AI</p>
-        <div className="mt-3 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-md border border-[rgba(125,211,252,0.38)] bg-[rgba(78,168,222,0.16)] text-sm font-black text-[var(--invest-cyan)]">
-            FA
-          </div>
-          <div>
-            <h1 className="text-lg font-black leading-tight text-white">
-              Estúdio Investigativo
-            </h1>
-            <p className="mt-1 text-xs text-[var(--invest-muted)]">
-              Auditoria pública assistida
-            </p>
-          </div>
+    <aside className="hidden min-h-dvh w-[268px] shrink-0 border-r border-[var(--invest-border)] bg-white px-4 py-5 shadow-[16px_0_32px_rgba(15,23,42,0.04)] lg:flex lg:flex-col">
+      <Link href="/dashboard" className="block rounded-lg border border-transparent px-2 py-2">
+        <div className="text-2xl font-black tracking-tight text-[var(--invest-primary)]">
+          fiscaliza<span className="text-[var(--invest-heading)]">.ai</span>
         </div>
+        <p className="mt-2 text-xs font-semibold leading-5 text-[var(--invest-muted)]">
+          Plataforma clara para ler dados públicos, explicar alertas e preservar provas.
+        </p>
       </Link>
 
-      <nav className="mt-7 space-y-7">
+      <nav className="mt-8 space-y-7">
         {navGroups.map((group) => (
           <div key={group.title}>
-            <p className="mb-2 px-2 text-[0.68rem] font-black uppercase tracking-[0.16em] text-[var(--invest-faint)]">
+            <p className="mb-2 px-3 text-[0.68rem] font-black uppercase tracking-[0.14em] text-[var(--invest-faint)]">
               {group.title}
             </p>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {group.items.map((item) => {
                 const active =
                   pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -65,20 +57,29 @@ export function AppSidebar() {
                     key={item.href}
                     href={item.href}
                     className={[
-                      "group relative block rounded-lg border px-4 py-3 transition duration-200",
+                      "group grid grid-cols-[34px_minmax(0,1fr)] items-center gap-3 rounded-lg border px-3 py-2.5 transition duration-200",
                       active
-                        ? "border-[rgba(125,211,252,0.45)] bg-[rgba(78,168,222,0.14)] text-white shadow-[0_16px_36px_rgba(78,168,222,0.1)]"
-                        : "border-transparent text-[var(--invest-muted)] hover:border-[var(--invest-border)] hover:bg-[rgba(16,24,39,0.72)]",
+                        ? "border-[rgba(49,92,255,0.28)] bg-[#f2f5ff] text-[var(--invest-heading)] shadow-[0_10px_22px_rgba(49,92,255,0.08)]"
+                        : "border-transparent text-[var(--invest-muted)] hover:border-[var(--invest-border)] hover:bg-[#f8fafc]",
                     ].join(" ")}
                   >
-                    {active && (
-                      <span className="absolute left-0 top-3 h-9 w-[3px] rounded-r bg-[var(--invest-cyan)]" />
-                    )}
-                    <span className="block text-sm font-extrabold">
-                      {item.label}
+                    <span
+                      className={[
+                        "flex h-8 w-8 items-center justify-center rounded-lg text-xs font-black",
+                        active
+                          ? "bg-[var(--invest-primary)] text-white"
+                          : "bg-[#eef2f8] text-[var(--invest-muted)] group-hover:text-[var(--invest-heading)]",
+                      ].join(" ")}
+                    >
+                      {item.mark}
                     </span>
-                    <span className="mt-0.5 block text-xs text-[var(--invest-muted)]">
-                      {item.description}
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-extrabold">
+                        {item.label}
+                      </span>
+                      <span className="block truncate text-xs text-[var(--invest-muted)]">
+                        {item.description}
+                      </span>
                     </span>
                   </Link>
                 );
@@ -88,22 +89,14 @@ export function AppSidebar() {
         ))}
       </nav>
 
-      <div className="mt-auto space-y-3">
-        <div className="invest-card p-4">
-          <p className="text-sm font-extrabold text-white">Modo responsável</p>
-          <p className="mt-2 text-xs leading-5 text-[var(--invest-muted)]">
-            Alertas indicam pontos de atenção. A confirmação depende de
-            investigação humana e documentos de origem.
-          </p>
-        </div>
-        <div className="rounded-lg border border-[rgba(45,212,191,0.24)] bg-[rgba(45,212,191,0.08)] px-4 py-3">
-          <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-success)]">
-            Núcleo preservado
-          </p>
-          <p className="mt-1 text-xs text-[var(--invest-muted)]">
-            ETL, análise e IA seguem intocados.
-          </p>
-        </div>
+      <div className="mt-auto rounded-lg border border-[var(--invest-border)] bg-[#f8fafc] p-4">
+        <p className="text-sm font-black text-[var(--invest-heading)]">
+          Regra de leitura
+        </p>
+        <p className="mt-2 text-xs leading-5 text-[var(--invest-muted)]">
+          Alerta não é condenação. É um sinal que precisa de explicação, prova
+          e checagem humana.
+        </p>
       </div>
     </aside>
   );

@@ -21,7 +21,6 @@ export default function CitiesPage() {
   const [cities, setCities] = useState<City[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
-
   const [name, setName] = useState("");
   const [state, setState] = useState("");
   const [portalUrl, setPortalUrl] = useState("");
@@ -77,22 +76,22 @@ export default function CitiesPage() {
   };
 
   return (
-    <div className="invest-page">
-      <section className="invest-page-hero p-6 md:p-8">
-        <p className="invest-eyebrow">Territórios monitorados</p>
+    <div className="page-shell">
+      <section className="page-header p-6 md:p-8">
+        <p className="invest-eyebrow">Cidades</p>
         <h1 className="invest-title mt-3 max-w-4xl text-3xl md:text-5xl">
-          Cidades e portais prontos para auditoria.
+          Bases públicas prontas para fiscalização.
         </h1>
         <p className="invest-subtitle mt-4 max-w-3xl text-base">
-          Organize municípios, estado, portal de transparência e cliente
-          responsável sem alterar o backend analítico.
+          Organize município, UF, portal e cliente responsável. A análise
+          continua intocada.
         </p>
       </section>
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-[460px_minmax(0,1fr)]">
-        <form onSubmit={handleAddCity} className="invest-card p-5">
+        <form onSubmit={handleAddCity} className="rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)]">
           <p className="invest-eyebrow">Nova cidade</p>
-          <h2 className="mt-2 text-xl font-black text-white">
+          <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
             Base monitorada
           </h2>
           <div className="mt-6 space-y-4">
@@ -153,11 +152,11 @@ export default function CitiesPage() {
           </div>
         </form>
 
-        <section className="invest-card overflow-hidden">
+        <section className="overflow-hidden rounded-lg border border-[var(--invest-border)] bg-white shadow-[var(--invest-shadow-soft)]">
           <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--invest-border)] p-5">
             <div>
               <p className="invest-eyebrow">Mapa operacional</p>
-              <h2 className="mt-2 text-xl font-black text-white">
+              <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
                 Cidades cadastradas
               </h2>
             </div>
@@ -174,7 +173,7 @@ export default function CitiesPage() {
                 Nenhuma cidade cadastrada ainda.
               </p>
             ) : (
-              <table className="invest-table">
+              <table className="data-table">
                 <thead>
                   <tr>
                     <th>Cidade/UF</th>
@@ -185,7 +184,7 @@ export default function CitiesPage() {
                 <tbody>
                   {cities.map((city) => (
                     <tr key={city.id}>
-                      <td className="font-bold text-white">
+                      <td className="font-bold text-[var(--invest-heading)]">
                         {city.name} - {city.state}
                       </td>
                       <td>{city.clients?.name || "Não vinculado"}</td>
@@ -195,12 +194,12 @@ export default function CitiesPage() {
                             href={city.portal_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="font-bold text-[var(--invest-cyan)] hover:underline"
+                            className="font-bold text-[var(--invest-primary)] hover:underline"
                           >
                             Acessar portal
                           </a>
                         ) : (
-                          <span className="text-[var(--invest-faint)]">
+                          <span className="text-[var(--invest-muted)]">
                             Sem link
                           </span>
                         )}

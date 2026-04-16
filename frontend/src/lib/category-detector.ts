@@ -18,35 +18,35 @@ export const categoryInfo: Record<
   contracts: {
     label: "Contratos",
     description:
-      "Para bases de contratos, termos, fornecedores, vigência, objeto, fiscais e modalidade.",
+      "Use para contratos, atas, termos, fornecedores, vigência, objeto e modalidade.",
     whenToUse:
-      "Use quando cada linha descreve contrato, aditivo, termo, ata ou vínculo formal com fornecedor.",
+      "Escolha quando o arquivo fala de contratação formal, ata, termo, aditivo ou vínculo com fornecedor.",
     detects: [
-      "concentração de valor contratado",
-      "repetições contratuais relevantes",
-      "contexto por modalidade e tipo de ato",
+      "valor contratado concentrado em fornecedor",
+      "contratos repetidos que merecem apuração",
+      "modalidade, tipo de ato e situação do contrato",
     ],
     examples: ["numero_contrato", "objeto", "vigencia", "fornecedor"],
   },
   payroll: {
     label: "Pessoal / RH",
     description:
-      "Para folha, salários, cargos, servidores, matrículas, diárias e remuneração.",
+      "Use para servidores, cargos, matrículas, folha, salários, diárias e remuneração.",
     whenToUse:
-      "Use quando a base descreve pessoas, vínculos funcionais, remuneração ou cargos.",
+      "Escolha quando cada linha descreve pessoa, vínculo funcional, cargo ou pagamento de pessoal.",
     detects: [
-      "valores individuais atípicos",
-      "concentrações por servidor",
-      "padrões de remuneração",
+      "valores individuais fora do padrão",
+      "concentração por servidor",
+      "padrões básicos de remuneração",
     ],
     examples: ["servidor", "cargo", "salario", "remuneracao"],
   },
   expenses: {
     label: "Despesas / Pagamentos",
     description:
-      "Para pagamentos, empenhos, liquidações, credores e despesas pagas.",
+      "Use para empenhos, liquidações, pagamentos, credores e despesas pagas.",
     whenToUse:
-      "Use quando a base descreve fluxo financeiro executado ou valores pagos a credores.",
+      "Escolha quando a base mostra dinheiro executado ou pago a credores.",
     detects: [
       "pagamentos repetidos",
       "concentração por credor",
@@ -57,9 +57,9 @@ export const categoryInfo: Record<
   bids: {
     label: "Licitações",
     description:
-      "Para pregões, dispensas, modalidades, certames, lotes e processos licitatórios.",
+      "Use para pregões, dispensas, certames, lotes, processos e modalidades.",
     whenToUse:
-      "Use quando o arquivo descreve etapa anterior à contratação ou disputa pública.",
+      "Escolha quando o arquivo descreve a disputa pública antes da contratação.",
     detects: [
       "modalidades concentradas",
       "valores por certame",
@@ -70,13 +70,13 @@ export const categoryInfo: Record<
   others: {
     label: "Outros",
     description:
-      "Para bases auxiliares que ainda não se encaixam nas categorias principais.",
+      "Use quando a base ainda não se encaixa com clareza nas categorias principais.",
     whenToUse:
-      "Use como opção provisória quando os campos não deixam clara a natureza do arquivo.",
+      "Escolha como opção provisória quando os campos não deixam clara a natureza do arquivo.",
     detects: [
-      "resumos básicos",
+      "resumo inicial",
       "campos preservados para rastreabilidade",
-      "análise genérica inicial",
+      "leitura genérica sem reclassificar a base",
     ],
     examples: ["arquivo diverso", "base auxiliar"],
   },

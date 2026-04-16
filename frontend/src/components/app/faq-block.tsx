@@ -1,40 +1,42 @@
 const faqs = [
   {
-    question: "O Fiscaliza.AI detecta fraude automaticamente?",
+    question: "O Fiscaliza.AI prova fraude sozinho?",
     answer:
-      "Não. O sistema aponta indícios e pontos de atenção para investigação humana.",
+      "Não. Ele mostra sinais que exigem explicação e guarda a origem para checagem humana.",
   },
   {
-    question: "Por que a categoria do upload importa?",
+    question: "Por que escolher a categoria certa?",
     answer:
-      "Porque contratos, folha, despesas e licitações têm semânticas diferentes.",
+      "Porque contrato, folha, despesa e licitação têm campos e leituras diferentes.",
   },
   {
     question: "O que é raw_json?",
     answer:
-      "É a linha original preservada do arquivo, usada para rastreabilidade.",
+      "É a linha original do arquivo, preservada para rastrear a origem do achado.",
   },
   {
-    question: "A IA decide sozinha?",
+    question: "A IA decide o resultado?",
     answer:
-      "Não. A IA resume e interpreta dados já calculados pelo backend.",
+      "Não. A IA resume dados já calculados pelo backend e deve ser lida como apoio.",
   },
 ];
 
 export function FaqBlock() {
   return (
-    <section className="invest-card p-5">
-      <p className="invest-eyebrow">Ajuda contextual</p>
-      <h2 className="mt-2 text-lg font-black text-white">Perguntas rápidas</h2>
+    <section className="rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)]">
+      <p className="invest-eyebrow">Ajuda rápida</p>
+      <h2 className="mt-2 text-lg font-black text-[var(--invest-heading)]">
+        Perguntas comuns
+      </h2>
       <div className="mt-5 space-y-3">
         {faqs.map((faq) => (
           <details
             key={faq.question}
-            className="group rounded-lg border border-[var(--invest-border)] bg-[rgba(3,7,18,0.34)] p-4 transition open:border-[rgba(125,211,252,0.36)]"
+            className="group rounded-lg border border-[var(--invest-border)] bg-[#fbfcff] p-4 transition open:border-[rgba(49,92,255,0.32)]"
           >
-            <summary className="flex list-none items-center justify-between gap-3 text-sm font-bold text-white">
+            <summary className="flex list-none items-center justify-between gap-3 text-sm font-bold text-[var(--invest-heading)]">
               {faq.question}
-              <span className="text-[var(--invest-cyan)] transition group-open:rotate-45">
+              <span className="text-[var(--invest-primary)] transition group-open:rotate-45">
                 +
               </span>
             </summary>

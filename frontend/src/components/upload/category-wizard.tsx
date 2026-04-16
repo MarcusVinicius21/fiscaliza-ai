@@ -7,9 +7,9 @@ import { UploadCategory, categoryInfo } from "@/lib/category-detector";
 
 const steps = [
   { label: "Arquivo", description: "Escolha a base pública" },
-  { label: "Categoria", description: "Valide o tipo do dado" },
-  { label: "Prévia", description: "Confira os cabeçalhos" },
-  { label: "Processar", description: "Envie para o fluxo validado" },
+  { label: "Categoria", description: "Confirme o tipo certo" },
+  { label: "Prévia", description: "Confira os campos" },
+  { label: "Enviar", description: "Use o fluxo validado" },
 ];
 
 export function CategoryWizard({
@@ -35,26 +35,25 @@ export function CategoryWizard({
       <ProgressSteps steps={steps} current={currentStep} />
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.25fr)_360px]">
-        <section className="invest-card p-5">
+        <section className="rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)]">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="invest-eyebrow">Classificação assistida</p>
-              <h2 className="mt-2 text-xl font-black text-white">
-                Escolha a categoria sem mexer no ETL
+              <p className="invest-eyebrow">Escolha guiada</p>
+              <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
+                Que tipo de arquivo é este?
               </h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--invest-muted)]">
-                A sugestão automática só interpreta os cabeçalhos do arquivo. A
-                decisão final continua sendo sua e o backend recebe os mesmos
-                campos já validados.
+                A sugestão olha apenas os cabeçalhos. Ela ajuda, mas você
+                confirma a categoria antes do envio.
               </p>
             </div>
 
             {suggestedCategory && (
-              <div className="rounded-lg border border-[rgba(125,211,252,0.34)] bg-[rgba(78,168,222,0.1)] px-4 py-3">
-                <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-cyan)]">
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-blue-700">
                   Sugestão
                 </p>
-                <p className="mt-1 text-sm font-black text-white">
+                <p className="mt-1 text-sm font-black text-blue-950">
                   {categoryInfo[suggestedCategory].label}
                 </p>
               </div>
@@ -73,18 +72,18 @@ export function CategoryWizard({
                   type="button"
                   onClick={() => onCategoryChange(key)}
                   className={[
-                    "group min-h-[148px] rounded-lg border p-4 text-left transition duration-200",
+                    "min-h-[148px] rounded-lg border p-4 text-left transition duration-200",
                     selected
-                      ? "border-[rgba(125,211,252,0.72)] bg-[rgba(78,168,222,0.16)] shadow-[0_16px_36px_rgba(78,168,222,0.12)]"
-                      : "border-[var(--invest-border)] bg-[rgba(3,7,18,0.35)] hover:border-[rgba(125,211,252,0.46)] hover:bg-[rgba(16,24,39,0.9)]",
+                      ? "border-[rgba(49,92,255,0.62)] bg-[#f2f5ff] shadow-[0_16px_30px_rgba(49,92,255,0.1)]"
+                      : "border-[var(--invest-border)] bg-white hover:border-[rgba(49,92,255,0.34)] hover:bg-[#fbfcff]",
                   ].join(" ")}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <span className="text-sm font-black text-white">
+                    <span className="text-sm font-black text-[var(--invest-heading)]">
                       {info.label}
                     </span>
                     {suggested && (
-                      <span className="invest-chip border-[rgba(125,211,252,0.32)] text-[var(--invest-cyan)]">
+                      <span className="app-chip border-blue-200 bg-blue-50 text-blue-700">
                         sugerida
                       </span>
                     )}
@@ -98,7 +97,7 @@ export function CategoryWizard({
           </div>
         </section>
 
-        <HelpPanel title={activeInfo.label} eyebrow="Detalhe da categoria">
+        <HelpPanel title={activeInfo.label} eyebrow="Categoria">
           <div className="space-y-4">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
@@ -108,11 +107,14 @@ export function CategoryWizard({
             </div>
             <div>
               <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
-                O que o sistema consegue apoiar
+                O sistema ajuda a ver
               </p>
               <ul className="mt-2 space-y-2">
                 {activeInfo.detects.map((item) => (
-                  <li key={item} className="rounded-md border border-[var(--invest-border)] bg-[rgba(3,7,18,0.28)] px-3 py-2">
+                  <li
+                    key={item}
+                    className="rounded-md border border-[var(--invest-border)] bg-[#fbfcff] px-3 py-2"
+                  >
                     {item}
                   </li>
                 ))}
@@ -123,15 +125,15 @@ export function CategoryWizard({
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="invest-card-solid p-5">
+        <section className="rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)]">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="invest-eyebrow">Prévia do arquivo</p>
-              <h2 className="mt-2 text-lg font-black text-white">
-                Cabeçalhos identificados
+              <p className="invest-eyebrow">Prévia</p>
+              <h2 className="mt-2 text-lg font-black text-[var(--invest-heading)]">
+                Campos encontrados no arquivo
               </h2>
             </div>
-            {file && <span className="invest-chip">{file.name}</span>}
+            {file && <span className="app-chip">{file.name}</span>}
           </div>
 
           {previewHeaders.length > 0 ? (
@@ -139,7 +141,7 @@ export function CategoryWizard({
               {previewHeaders.slice(0, 18).map((header) => (
                 <span
                   key={header}
-                  className="rounded-full border border-[rgba(148,163,184,0.22)] bg-[rgba(3,7,18,0.45)] px-3 py-1.5 text-xs font-bold text-[#d8e2f0]"
+                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700"
                 >
                   {header}
                 </span>
@@ -147,9 +149,8 @@ export function CategoryWizard({
             </div>
           ) : (
             <p className="mt-5 text-sm leading-6 text-[var(--invest-muted)]">
-              Selecione um CSV para visualizar os primeiros campos. Arquivos
-              Excel continuam aceitos, mas a prévia automática usa o cabeçalho
-              textual quando disponível.
+              Selecione um CSV para ver os primeiros campos. Excel continua
+              aceito; a prévia automática depende de cabeçalho textual.
             </p>
           )}
         </section>
@@ -157,15 +158,15 @@ export function CategoryWizard({
         <div className="space-y-4">
           {file && (
             <InlineToast
-              title="Arquivo pronto para revisão"
-              message={`Base selecionada: ${file.name}`}
+              title="Arquivo selecionado"
+              message={`Base pronta para revisão: ${file.name}`}
               tone="info"
             />
           )}
 
           {suggestedCategory && (
             <InlineToast
-              title="Sugestão não vinculante"
+              title="Sugestão não obrigatória"
               message={`${categoryInfo[suggestedCategory].label} parece compatível. Confirme antes de enviar.`}
               tone="success"
             />

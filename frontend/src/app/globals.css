@@ -1,24 +1,27 @@
 @import "tailwindcss";
 
 :root {
-  --invest-bg: #070a0f;
-  --invest-bg-2: #0a111c;
-  --invest-card: #101827;
-  --invest-card-2: #131e2f;
-  --invest-card-soft: rgba(16, 24, 39, 0.72);
-  --invest-border: rgba(148, 163, 184, 0.2);
-  --invest-border-strong: rgba(125, 211, 252, 0.42);
-  --invest-text: #f8fafc;
-  --invest-muted: #a8b3c7;
-  --invest-faint: #64748b;
+  --invest-bg: #f5f7fb;
+  --invest-bg-soft: #eef2f8;
+  --invest-surface: #ffffff;
+  --invest-surface-raised: #ffffff;
+  --invest-card: #ffffff;
+  --invest-card-soft: #f8fafc;
+  --invest-border: #e3e8f2;
+  --invest-border-strong: #cfd8e6;
+  --invest-text: #111827;
+  --invest-heading: #070b18;
+  --invest-muted: #667085;
+  --invest-faint: #98a2b3;
+  --invest-primary: #315cff;
+  --invest-primary-strong: #1d4ed8;
+  --invest-info: #2f80ed;
+  --invest-cyan: #12b8a6;
   --invest-danger: #e63946;
-  --invest-warning: #f5b84b;
-  --invest-info: #4ea8de;
-  --invest-cyan: #7dd3fc;
-  --invest-success: #2dd4bf;
-  --invest-ink: #030712;
-  --invest-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
-  --invest-shadow-soft: 0 14px 36px rgba(0, 0, 0, 0.22);
+  --invest-warning: #f97316;
+  --invest-success: #12a980;
+  --invest-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+  --invest-shadow-soft: 0 10px 26px rgba(15, 23, 42, 0.06);
   --invest-radius: 8px;
 }
 
@@ -29,16 +32,16 @@
 html {
   min-height: 100%;
   background: var(--invest-bg);
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
   margin: 0;
   min-height: 100%;
   background:
-    linear-gradient(145deg, rgba(78, 168, 222, 0.1), transparent 28%),
-    linear-gradient(220deg, rgba(245, 184, 75, 0.08), transparent 30%),
-    linear-gradient(180deg, #080b12 0%, #0b111d 44%, #06080d 100%);
+    radial-gradient(circle at 8% 4%, rgba(49, 92, 255, 0.08), transparent 28%),
+    radial-gradient(circle at 84% 0%, rgba(18, 184, 166, 0.08), transparent 26%),
+    linear-gradient(180deg, #f7f9fd 0%, #f2f5fa 46%, #eef2f8 100%);
   color: var(--invest-text);
   text-rendering: geometricPrecision;
 }
@@ -64,12 +67,16 @@ a[href] {
 }
 
 ::selection {
-  background: rgba(78, 168, 222, 0.34);
+  background: rgba(49, 92, 255, 0.18);
+  color: var(--invest-heading);
+}
+
+.fiscaliza-shell {
   color: var(--invest-text);
 }
 
 .invest-soft-scroll {
-  scrollbar-color: rgba(148, 163, 184, 0.36) transparent;
+  scrollbar-color: rgba(102, 112, 133, 0.42) transparent;
   scrollbar-width: thin;
 }
 
@@ -79,54 +86,63 @@ a[href] {
 }
 
 .invest-soft-scroll::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.34);
-  border-radius: 8px;
+  background: rgba(102, 112, 133, 0.34);
   border: 2px solid transparent;
+  border-radius: 8px;
   background-clip: padding-box;
 }
 
 .invest-page {
   display: grid;
-  gap: 28px;
+  gap: 24px;
 }
 
+.page-shell {
+  display: grid;
+  gap: 24px;
+}
+
+.page-header,
 .invest-page-hero {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(125, 211, 252, 0.22);
+  border: 1px solid var(--invest-border);
   border-radius: var(--invest-radius);
   background:
-    linear-gradient(135deg, rgba(16, 24, 39, 0.94), rgba(9, 14, 23, 0.98)),
-    linear-gradient(90deg, rgba(78, 168, 222, 0.15), transparent);
+    linear-gradient(135deg, rgba(49, 92, 255, 0.08), transparent 42%),
+    linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
   box-shadow: var(--invest-shadow-soft);
 }
 
-.invest-page-hero::before {
+.page-header::after,
+.invest-page-hero::after {
   content: "";
   position: absolute;
-  inset: 0;
+  right: -90px;
+  top: -110px;
+  width: 280px;
+  height: 280px;
   pointer-events: none;
-  background-image:
-    linear-gradient(rgba(125, 211, 252, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(125, 211, 252, 0.05) 1px, transparent 1px);
-  background-size: 42px 42px;
-  mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0.7), transparent 72%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(49, 92, 255, 0.14), transparent 64%);
 }
 
+.page-header > *,
 .invest-page-hero > * {
   position: relative;
+  z-index: 1;
 }
 
 .invest-eyebrow {
-  color: var(--invest-cyan);
+  color: var(--invest-primary);
   font-size: 0.72rem;
   font-weight: 800;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 .invest-title {
-  color: var(--invest-text);
+  color: var(--invest-heading);
   font-weight: 800;
   letter-spacing: 0;
   line-height: 1.05;
@@ -137,33 +153,35 @@ a[href] {
   line-height: 1.65;
 }
 
-.invest-card {
+.invest-card,
+.invest-card-solid,
+.soft-card,
+.panel-card {
   border: 1px solid var(--invest-border);
   border-radius: var(--invest-radius);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 42%),
-    var(--invest-card-soft);
+  background: var(--invest-surface);
   box-shadow: var(--invest-shadow-soft);
 }
 
-.invest-card-solid {
-  border: 1px solid var(--invest-border);
-  border-radius: var(--invest-radius);
-  background: var(--invest-card);
-  box-shadow: var(--invest-shadow-soft);
-}
-
-.invest-card-highlight {
-  border: 1px solid rgba(125, 211, 252, 0.38);
+.invest-card-highlight,
+.insight-card {
+  border: 1px solid rgba(49, 92, 255, 0.22);
   border-radius: var(--invest-radius);
   background:
-    linear-gradient(135deg, rgba(78, 168, 222, 0.18), rgba(16, 24, 39, 0.78)),
-    var(--invest-card);
-  box-shadow: 0 18px 48px rgba(78, 168, 222, 0.08);
+    linear-gradient(135deg, rgba(49, 92, 255, 0.09), rgba(255, 255, 255, 0.96) 46%),
+    #ffffff;
+  box-shadow: var(--invest-shadow);
+}
+
+.evidence-card {
+  border: 1px solid rgba(249, 115, 22, 0.22);
+  border-left: 4px solid var(--invest-warning);
+  border-radius: var(--invest-radius);
+  background: #fffaf5;
 }
 
 .invest-section-title {
-  color: var(--invest-text);
+  color: var(--invest-heading);
   font-size: 1rem;
   font-weight: 800;
   letter-spacing: 0;
@@ -181,6 +199,42 @@ a[href] {
   font-variant-numeric: tabular-nums;
 }
 
+.metric-card,
+.invest-kpi {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--invest-border);
+  border-radius: var(--invest-radius);
+  background: var(--invest-surface);
+  padding: 1rem;
+  box-shadow: var(--invest-shadow-soft);
+}
+
+.metric-card::before,
+.invest-kpi::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--invest-primary), rgba(18, 184, 166, 0.8));
+}
+
+.metric-label {
+  color: var(--invest-muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.metric-value {
+  color: var(--invest-heading);
+  font-size: 1.75rem;
+  font-weight: 850;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
 .invest-input,
 .invest-select,
 .invest-textarea,
@@ -189,10 +243,10 @@ a[href] {
 .fiscaliza-shell textarea {
   min-height: 44px;
   width: 100%;
-  border: 1px solid rgba(148, 163, 184, 0.24);
+  border: 1px solid #d8deea;
   border-radius: var(--invest-radius);
-  background: rgba(3, 7, 18, 0.74);
-  color: var(--invest-text);
+  background: #ffffff;
+  color: var(--invest-heading);
   outline: none;
   transition:
     border-color 180ms ease,
@@ -202,22 +256,19 @@ a[href] {
 
 .invest-input,
 .invest-select,
-.invest-textarea {
-  padding: 0.68rem 0.84rem;
-}
-
+.invest-textarea,
 .fiscaliza-shell input:not([type="file"]),
 .fiscaliza-shell select,
 .fiscaliza-shell textarea {
-  padding: 0.68rem 0.84rem;
+  padding: 0.72rem 0.86rem;
 }
 
 .fiscaliza-shell input[type="file"] {
   width: 100%;
   min-height: 44px;
-  border: 1px dashed rgba(125, 211, 252, 0.34);
+  border: 1px dashed #c7d2e4;
   border-radius: var(--invest-radius);
-  background: rgba(3, 7, 18, 0.6);
+  background: #ffffff;
   color: var(--invest-muted);
   padding: 0.65rem;
 }
@@ -226,7 +277,7 @@ a[href] {
 .invest-textarea::placeholder,
 .fiscaliza-shell input::placeholder,
 .fiscaliza-shell textarea::placeholder {
-  color: #8190a6;
+  color: #98a2b3;
 }
 
 .invest-input:focus,
@@ -235,41 +286,42 @@ a[href] {
 .fiscaliza-shell input:focus,
 .fiscaliza-shell select:focus,
 .fiscaliza-shell textarea:focus {
-  border-color: rgba(125, 211, 252, 0.74);
-  background: rgba(7, 13, 24, 0.96);
-  box-shadow: 0 0 0 3px rgba(78, 168, 222, 0.16);
+  border-color: rgba(49, 92, 255, 0.72);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(49, 92, 255, 0.12);
 }
 
 .fiscaliza-shell option {
-  background: #0b1220;
-  color: var(--invest-text);
+  background: #ffffff;
+  color: var(--invest-heading);
 }
 
 .invest-label {
   display: block;
   margin-bottom: 0.42rem;
-  color: #d8e2f0;
+  color: var(--invest-heading);
   font-size: 0.82rem;
-  font-weight: 700;
+  font-weight: 750;
 }
 
 .invest-helper {
   margin-top: 0.38rem;
-  color: var(--invest-faint);
+  color: var(--invest-muted);
   font-size: 0.78rem;
   line-height: 1.4;
 }
 
-.invest-button {
+.invest-button,
+.button-primary {
   min-height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  border: 1px solid transparent;
   border-radius: var(--invest-radius);
-  border: 1px solid rgba(125, 211, 252, 0.36);
-  background: linear-gradient(135deg, #4ea8de, #7dd3fc);
-  color: #05111d;
+  background: linear-gradient(135deg, #315cff, #1d4ed8);
+  color: #ffffff;
   font-weight: 800;
   transition:
     transform 180ms ease,
@@ -278,120 +330,113 @@ a[href] {
     border-color 180ms ease;
 }
 
-.invest-button:hover {
+.invest-button:hover,
+.button-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 14px 30px rgba(78, 168, 222, 0.18);
+  box-shadow: 0 14px 28px rgba(49, 92, 255, 0.2);
 }
 
-.invest-button:disabled {
+.invest-button:disabled,
+.button-primary:disabled {
   cursor: not-allowed;
   opacity: 0.5;
   transform: none;
   box-shadow: none;
 }
 
-.invest-button-secondary {
+.invest-button-secondary,
+.button-secondary {
   min-height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  border: 1px solid #d8deea;
   border-radius: var(--invest-radius);
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  background: rgba(15, 23, 42, 0.68);
-  color: var(--invest-text);
-  font-weight: 700;
+  background: #ffffff;
+  color: var(--invest-primary);
+  font-weight: 750;
   transition:
     background 180ms ease,
     border-color 180ms ease,
-    transform 180ms ease;
+    transform 180ms ease,
+    box-shadow 180ms ease;
 }
 
-.invest-button-secondary:hover {
-  border-color: rgba(125, 211, 252, 0.52);
-  background: rgba(20, 32, 51, 0.86);
+.invest-button-secondary:hover,
+.button-secondary:hover {
+  border-color: rgba(49, 92, 255, 0.42);
+  background: #f5f7ff;
   transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
 }
 
-.invest-kpi {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--invest-border);
-  border-radius: var(--invest-radius);
-  background:
-    linear-gradient(180deg, rgba(125, 211, 252, 0.08), transparent 58%),
-    rgba(16, 24, 39, 0.78);
-  padding: 1.1rem;
-}
-
-.invest-kpi::after {
-  content: "";
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 2px;
-  background: linear-gradient(90deg, var(--invest-info), transparent);
-  opacity: 0.75;
-}
-
-.invest-table {
+.invest-table,
+.data-table {
   width: 100%;
   border-collapse: collapse;
   color: var(--invest-text);
   font-size: 0.875rem;
 }
 
-.invest-table thead {
-  background: rgba(3, 7, 18, 0.46);
+.invest-table thead,
+.data-table thead {
+  background: #f8fafc;
 }
 
-.invest-table th {
+.invest-table th,
+.data-table th {
   padding: 0.9rem 1rem;
   color: var(--invest-muted);
-  font-size: 0.74rem;
-  font-weight: 800;
+  font-size: 0.72rem;
+  font-weight: 850;
   letter-spacing: 0.08em;
   text-align: left;
   text-transform: uppercase;
 }
 
-.invest-table td {
-  border-top: 1px solid rgba(148, 163, 184, 0.13);
+.invest-table td,
+.data-table td {
+  border-top: 1px solid var(--invest-border);
   padding: 1rem;
-  color: #e2e8f0;
+  color: var(--invest-text);
   vertical-align: top;
 }
 
-.invest-table tbody tr {
+.invest-table tbody tr,
+.data-table tbody tr {
   transition: background 160ms ease;
 }
 
-.invest-table tbody tr:hover {
-  background: rgba(78, 168, 222, 0.06);
+.invest-table tbody tr:hover,
+.data-table tbody tr:hover {
+  background: #f8fbff;
 }
 
-.invest-chip {
+.invest-chip,
+.app-chip {
   display: inline-flex;
   min-height: 28px;
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
+  border: 1px solid #d8deea;
   border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.24);
-  background: rgba(15, 23, 42, 0.64);
-  color: #d8e2f0;
+  background: #ffffff;
+  color: #344054;
   padding: 0.25rem 0.65rem;
   font-size: 0.76rem;
-  font-weight: 700;
+  font-weight: 750;
 }
 
 .invest-divider {
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.2), transparent);
+  background: linear-gradient(90deg, transparent, rgba(102, 112, 133, 0.24), transparent);
 }
 
 .invest-evidence {
-  border-left: 2px solid rgba(125, 211, 252, 0.72);
-  background: rgba(78, 168, 222, 0.06);
+  border-left: 4px solid var(--invest-primary);
+  background: #f5f7ff;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -32,24 +32,27 @@ interface UploadRecord {
   cities: { name: string; state: string } | null;
 }
 
+type StatusTone = "info" | "danger" | "success" | "muted" | "warning";
+
 const REPORT_TYPES: Record<string, { id: string; label: string }[]> = {
   payroll: [
-    { id: "servidores", label: "Lista de Servidores" },
-    { id: "salarios", label: "Folha de Pagamento" },
-    { id: "diarias", label: "Diárias de Viagem" },
+    { id: "servidores", label: "Lista de servidores" },
+    { id: "salarios", label: "Folha de pagamento" },
+    { id: "diarias", label: "Diárias de viagem" },
     { id: "terceirizados", label: "Terceirizados" },
   ],
   expenses: [
     { id: "empenhos", label: "Empenhos" },
     { id: "liquidacoes", label: "Liquidações" },
-    { id: "pagamentos", label: "Pagamentos Realizados" },
+    { id: "pagamentos", label: "Pagamentos realizados" },
   ],
-  default: [{ id: "geral", label: "Relatório Geral" }],
+  default: [{ id: "geral", label: "Relatório geral" }],
 };
 
-function statusTone(status?: string) {
+function statusTone(status?: string): StatusTone {
   if (status === "processed" || status === "analyzed") return "success";
   if (status === "error") return "danger";
+  if (status === "pending") return "warning";
   return "muted";
 }
 
@@ -219,55 +222,42 @@ export default function UploadsPage() {
   const analyzedCount = uploads.filter((item) => item.analysis_status === "analyzed").length;
 
   return (
-    <div className="invest-page">
-      <section className="invest-page-hero p-6 md:p-8">
+    <div className="page-shell">
+      <section className="page-header p-6 md:p-8">
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
           <div>
             <p className="invest-eyebrow">Entrada de dados</p>
             <h1 className="invest-title mt-3 max-w-3xl text-3xl md:text-5xl">
-              Upload investigativo com orientação de categoria.
+              Envie um arquivo sem escolher a categoria no escuro.
             </h1>
             <p className="invest-subtitle mt-4 max-w-3xl text-base">
-              Envie bases públicas com contexto claro. O wizard melhora a
-              escolha da categoria e preserva integralmente o fluxo validado de
-              upload, processamento e análise.
+              A prévia ajuda a entender o arquivo antes do envio. O upload,
+              processamento e análise continuam usando os fluxos já validados.
             </p>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
-            <div className="invest-kpi">
-              <p className="text-xs font-bold text-[var(--invest-muted)]">
-                Cidades
-              </p>
-              <p className="invest-number mt-2 text-2xl font-black text-white">
-                {cities.length}
-              </p>
+            <div className="metric-card">
+              <p className="metric-label">Cidades</p>
+              <p className="metric-value mt-3">{cities.length}</p>
             </div>
-            <div className="invest-kpi">
-              <p className="text-xs font-bold text-[var(--invest-muted)]">
-                Processados
-              </p>
-              <p className="invest-number mt-2 text-2xl font-black text-white">
-                {processedCount}
-              </p>
+            <div className="metric-card">
+              <p className="metric-label">Processados</p>
+              <p className="metric-value mt-3">{processedCount}</p>
             </div>
-            <div className="invest-kpi">
-              <p className="text-xs font-bold text-[var(--invest-muted)]">
-                Analisados
-              </p>
-              <p className="invest-number mt-2 text-2xl font-black text-white">
-                {analyzedCount}
-              </p>
+            <div className="metric-card">
+              <p className="metric-label">Analisados</p>
+              <p className="metric-value mt-3">{analyzedCount}</p>
             </div>
           </div>
         </div>
       </section>
 
       {statusMessage && (
-        <InlineToast title="Status operacional" message={statusMessage} />
+        <InlineToast title="Status" message={statusMessage} />
       )}
 
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-6">
           <CategoryWizard
             currentStep={wizardStep}
@@ -282,19 +272,20 @@ export default function UploadsPage() {
             }}
           />
 
-          <form onSubmit={handleUpload} className="invest-card p-5">
+          <form onSubmit={handleUpload} className="rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)]">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <p className="invest-eyebrow">Formulário operacional</p>
-                <h2 className="mt-2 text-xl font-black text-white">
-                  Dados mínimos para entrada segura
+                <p className="invest-eyebrow">Dados obrigatórios</p>
+                <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
+                  Prepare o arquivo para entrada
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-[var(--invest-muted)]">
-                  Os campos abaixo mantêm o mesmo payload usado pelo backend.
+                  Esses campos são os mesmos enviados ao backend. Nada aqui
+                  altera o ETL nem o raw_json.
                 </p>
               </div>
               <StatusPill tone={uploading ? "warning" : "info"}>
-                {uploading ? "Enviando" : "Pronto para envio"}
+                {uploading ? "Enviando" : "Pronto"}
               </StatusPill>
             </div>
 
@@ -342,7 +333,7 @@ export default function UploadsPage() {
               </div>
 
               <div>
-                <label className="invest-label">Relatório *</label>
+                <label className="invest-label">Tipo do documento *</label>
                 <select
                   required
                   disabled={!category}
@@ -351,7 +342,7 @@ export default function UploadsPage() {
                   className="invest-select disabled:opacity-50"
                 >
                   <option value="" disabled>
-                    Selecione o subtipo
+                    Selecione o tipo
                   </option>
                   {currentReportTypes.map((rt) => (
                     <option key={rt.id} value={rt.id}>
@@ -389,8 +380,7 @@ export default function UploadsPage() {
 
             <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--invest-border)] pt-5">
               <p className="max-w-2xl text-sm leading-6 text-[var(--invest-muted)]">
-                A categoria orienta a leitura da Etapa 5, mas não altera o
-                arquivo original nem o `raw_json` preservado.
+                A categoria orienta a análise, mas não muda o arquivo original.
               </p>
               <button
                 type="submit"
@@ -405,18 +395,18 @@ export default function UploadsPage() {
 
         <div className="space-y-5">
           <FaqBlock />
-          <section className="invest-card p-5">
+          <section className="rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)]">
             <p className="invest-eyebrow">Categorias</p>
-            <h2 className="mt-2 text-lg font-black text-white">
+            <h2 className="mt-2 text-lg font-black text-[var(--invest-heading)]">
               Como decidir rápido
             </h2>
             <div className="mt-5 space-y-3">
               {(Object.keys(categoryInfo) as UploadCategory[]).map((key) => (
                 <div
                   key={key}
-                  className="rounded-lg border border-[var(--invest-border)] bg-[rgba(3,7,18,0.3)] p-3"
+                  className="rounded-lg border border-[var(--invest-border)] bg-[#fbfcff] p-3"
                 >
-                  <p className="text-sm font-black text-white">
+                  <p className="text-sm font-black text-[var(--invest-heading)]">
                     {categoryInfo[key].label}
                   </p>
                   <p className="mt-1 text-xs leading-5 text-[var(--invest-muted)]">
@@ -429,27 +419,26 @@ export default function UploadsPage() {
         </div>
       </section>
 
-      <section className="invest-card overflow-hidden">
+      <section className="overflow-hidden rounded-lg border border-[var(--invest-border)] bg-white shadow-[var(--invest-shadow-soft)]">
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--invest-border)] p-5">
           <div>
             <p className="invest-eyebrow">Histórico</p>
-            <h2 className="mt-2 text-xl font-black text-white">
-              Uploads importados
+            <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
+              Arquivos importados
             </h2>
             <p className="mt-2 text-sm text-[var(--invest-muted)]">
-              Processamento e análise continuam chamando os endpoints já
-              validados.
+              Processar e analisar continuam chamando os endpoints validados.
             </p>
           </div>
           <StatusPill tone="muted">{uploads.length} arquivos</StatusPill>
         </div>
 
         <div className="invest-soft-scroll overflow-x-auto">
-          <table className="invest-table">
+          <table className="data-table">
             <thead>
               <tr>
                 <th>Arquivo</th>
-                <th>Contexto</th>
+                <th>Categoria do arquivo</th>
                 <th>Status</th>
                 <th>Ações</th>
               </tr>
@@ -467,18 +456,18 @@ export default function UploadsPage() {
                 uploads.map((up) => (
                   <tr key={up.id}>
                     <td>
-                      <p className="max-w-[320px] truncate font-bold text-white" title={up.file_name}>
+                      <p className="max-w-[320px] truncate font-bold text-[var(--invest-heading)]" title={up.file_name}>
                         {up.file_name}
                       </p>
-                      <p className="mt-1 text-xs text-[var(--invest-faint)]">
+                      <p className="mt-1 text-xs text-[var(--invest-muted)]">
                         {up.cities?.name
                           ? `${up.cities.name}/${up.cities.state}`
                           : "Cidade não informada"}
                       </p>
                     </td>
                     <td>
-                      <span className="block font-bold text-white">
-                        {categoryLabel(up.category)} → {up.report_type || "geral"}
+                      <span className="block font-bold text-[var(--invest-heading)]">
+                        {categoryLabel(up.category)} - {up.report_type || "geral"}
                       </span>
                       <span className="text-xs text-[var(--invest-muted)]">
                         {up.report_label || "Sem rótulo"}
@@ -496,7 +485,7 @@ export default function UploadsPage() {
                             onClick={() => handleProcess(up.id)}
                             className="invest-button-secondary px-3 py-1 text-xs"
                           >
-                            Processar IA
+                            Processar
                           </button>
                         )}
 
@@ -506,7 +495,7 @@ export default function UploadsPage() {
                               onClick={() => handleAnalyze(up.id)}
                               className="invest-button px-3 py-1 text-xs"
                             >
-                              Rodar análise IA
+                              Analisar
                             </button>
                           )}
 

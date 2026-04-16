@@ -20,23 +20,23 @@ export function ProgressSteps({
           <div
             key={step.label}
             className={[
-              "relative overflow-hidden rounded-lg border p-4 transition duration-200",
+              "rounded-lg border bg-white p-4 transition duration-200",
               active
-                ? "border-[rgba(125,211,252,0.54)] bg-[rgba(78,168,222,0.13)] shadow-[0_16px_36px_rgba(78,168,222,0.1)]"
+                ? "border-[rgba(49,92,255,0.34)] shadow-[0_14px_28px_rgba(49,92,255,0.1)]"
                 : done
-                  ? "border-[rgba(45,212,191,0.38)] bg-[rgba(45,212,191,0.08)]"
-                  : "border-[var(--invest-border)] bg-[rgba(16,24,39,0.58)]",
+                  ? "border-emerald-200 bg-emerald-50"
+                  : "border-[var(--invest-border)]",
             ].join(" ")}
           >
             <div className="mb-4 flex items-center justify-between">
               <span
                 className={[
-                  "flex h-8 w-8 items-center justify-center rounded-md border text-xs font-black",
+                  "flex h-8 w-8 items-center justify-center rounded-lg border text-xs font-black",
                   active
-                    ? "border-[rgba(125,211,252,0.6)] bg-[rgba(125,211,252,0.18)] text-[var(--invest-cyan)]"
+                    ? "border-[var(--invest-primary)] bg-[var(--invest-primary)] text-white"
                     : done
-                      ? "border-[rgba(45,212,191,0.5)] bg-[rgba(45,212,191,0.14)] text-[var(--invest-success)]"
-                      : "border-[var(--invest-border)] text-[var(--invest-muted)]",
+                      ? "border-emerald-200 bg-white text-emerald-700"
+                      : "border-slate-200 bg-slate-50 text-slate-500",
                 ].join(" ")}
               >
                 {String(index + 1).padStart(2, "0")}
@@ -45,7 +45,9 @@ export function ProgressSteps({
                 {done ? "feito" : active ? "agora" : "próximo"}
               </span>
             </div>
-            <p className="text-sm font-black text-white">{step.label}</p>
+            <p className="text-sm font-black text-[var(--invest-heading)]">
+              {step.label}
+            </p>
             <p className="mt-1 text-xs leading-5 text-[var(--invest-muted)]">
               {step.description}
             </p>

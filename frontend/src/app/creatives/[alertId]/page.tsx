@@ -42,6 +42,8 @@ interface CreativeResponse {
   source: CreativeSource;
 }
 
+type StatusTone = "info" | "danger" | "success" | "muted" | "warning";
+
 function normalizeLabel(value: unknown) {
   const txt = String(value || "").trim();
   return txt || "Não informado";
@@ -49,24 +51,20 @@ function normalizeLabel(value: unknown) {
 
 function severityLabel(value: unknown) {
   const sev = String(value || "").toLowerCase();
-
   if (sev.includes("alta")) return "Alta";
   if (sev.includes("media") || sev.includes("média")) return "Média";
   if (sev.includes("baixa")) return "Baixa";
-
   return "Baixa";
 }
 
 function severityColor(value: unknown) {
   const sev = String(value || "").toLowerCase();
-
-  if (sev.includes("alta")) return "#E63946";
-  if (sev.includes("media") || sev.includes("média")) return "#F5B84B";
-
-  return "#4EA8DE";
+  if (sev.includes("alta")) return "#e63946";
+  if (sev.includes("media") || sev.includes("média")) return "#f97316";
+  return "#315cff";
 }
 
-function severityTone(value: unknown) {
+function severityTone(value: unknown): StatusTone {
   const sev = String(value || "").toLowerCase();
   if (sev.includes("alta")) return "danger";
   if (sev.includes("media") || sev.includes("média")) return "warning";
@@ -75,10 +73,7 @@ function severityTone(value: unknown) {
 
 function parseAmount(value: unknown) {
   if (value === null || value === undefined || value === "") return 0;
-
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : 0;
-  }
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
 
   const normalized = String(value)
     .replace("R$", "")
@@ -119,7 +114,6 @@ function wrapCanvasText(
   }
 
   if (current) lines.push(current);
-
   return lines;
 }
 
@@ -133,11 +127,9 @@ function drawWrappedText(
   maxLines: number
 ) {
   const lines = wrapCanvasText(ctx, text, maxWidth).slice(0, maxLines);
-
   lines.forEach((line, index) => {
     ctx.fillText(line, x, y + index * lineHeight);
   });
-
   return y + lines.length * lineHeight;
 }
 
@@ -153,80 +145,61 @@ function drawCreative(canvas: HTMLCanvasElement, data: CreativeResponse) {
   canvas.width = width;
   canvas.height = height;
 
-  const gradient = ctx.createLinearGradient(0, 0, width, height);
-  gradient.addColorStop(0, "#070A0F");
-  gradient.addColorStop(0.48, "#101827");
-  gradient.addColorStop(1, "#06080D");
-
-  ctx.fillStyle = gradient;
+  ctx.fillStyle = "#f5f7fb";
   ctx.fillRect(0, 0, width, height);
 
-  ctx.strokeStyle = "rgba(125, 211, 252, 0.13)";
-  ctx.lineWidth = 1;
-  for (let x = 0; x < width; x += 54) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, height);
-    ctx.stroke();
-  }
-  for (let y = 0; y < height; y += 54) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(width, y);
-    ctx.stroke();
-  }
-
-  ctx.fillStyle = "rgba(16, 24, 39, 0.88)";
-  ctx.fillRect(margin, 70, width - margin * 2, height - 140);
-  ctx.strokeStyle = "rgba(148, 163, 184, 0.24)";
-  ctx.strokeRect(margin, 70, width - margin * 2, height - 140);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(54, 54, width - 108, height - 108);
+  ctx.strokeStyle = "#dbe3ef";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(54, 54, width - 108, height - 108);
 
   ctx.fillStyle = accent;
-  ctx.fillRect(margin, 70, 12, height - 140);
+  ctx.fillRect(54, 54, width - 108, 14);
 
-  ctx.fillStyle = "#F8FAFC";
+  ctx.fillStyle = "#111827";
   ctx.font = "800 34px Arial";
-  ctx.fillText("FISCALIZA.AI", margin + 44, 136);
+  ctx.fillText("Fiscaliza.AI", margin, 126);
 
-  ctx.fillStyle = "#A8B3C7";
+  ctx.fillStyle = "#667085";
   ctx.font = "400 24px Arial";
-  ctx.fillText("Transparência pública em linguagem simples", margin + 44, 178);
+  ctx.fillText("Dados públicos em linguagem simples", margin, 168);
 
-  ctx.fillStyle = "rgba(3, 7, 18, 0.62)";
-  ctx.fillRect(margin + 44, 230, 238, 58);
-  ctx.strokeStyle = accent;
-  ctx.strokeRect(margin + 44, 230, 238, 58);
+  ctx.fillStyle = "#f8fafc";
+  ctx.fillRect(margin, 220, 260, 62);
+  ctx.strokeStyle = "#dbe3ef";
+  ctx.strokeRect(margin, 220, 260, 62);
 
   ctx.fillStyle = accent;
-  ctx.font = "800 23px Arial";
+  ctx.font = "800 24px Arial";
   ctx.fillText(
     `Alerta ${severityLabel(data.source.alert?.severity)}`,
-    margin + 66,
-    268
+    margin + 24,
+    260
   );
 
-  ctx.fillStyle = "#F8FAFC";
+  ctx.fillStyle = "#070b18";
   ctx.font = "800 62px Arial";
   let currentY = drawWrappedText(
     ctx,
     data.creative.title,
-    margin + 44,
-    395,
-    width - margin * 2 - 88,
+    margin,
+    386,
+    width - margin * 2,
     70,
     3
   );
 
   currentY += 34;
 
-  ctx.fillStyle = "#CBD5E1";
+  ctx.fillStyle = "#344054";
   ctx.font = "400 34px Arial";
   currentY = drawWrappedText(
     ctx,
     data.creative.subtitle,
-    margin + 44,
+    margin,
     currentY,
-    width - margin * 2 - 88,
+    width - margin * 2,
     45,
     3
   );
@@ -234,103 +207,101 @@ function drawCreative(canvas: HTMLCanvasElement, data: CreativeResponse) {
   currentY += 58;
 
   ctx.fillStyle = accent;
-  ctx.font = "800 46px Arial";
-  ctx.fillText(formatMoney(data.source.alert?.amount), margin + 44, currentY);
+  ctx.font = "800 48px Arial";
+  ctx.fillText(formatMoney(data.source.alert?.amount), margin, currentY);
 
-  currentY += 58;
+  currentY += 62;
 
-  ctx.fillStyle = "#A8B3C7";
-  ctx.font = "400 27px Arial";
+  ctx.fillStyle = "#667085";
+  ctx.font = "400 28px Arial";
   currentY = drawWrappedText(
     ctx,
     `Fornecedor: ${normalizeLabel(data.source.alert?.supplier_name)}`,
-    margin + 44,
+    margin,
     currentY,
-    width - margin * 2 - 88,
-    36,
+    width - margin * 2,
+    38,
     2
   );
 
-  currentY += 68;
+  currentY += 66;
 
-  ctx.fillStyle = "#E2E8F0";
+  ctx.fillStyle = "#111827";
   ctx.font = "400 32px Arial";
   currentY = drawWrappedText(
     ctx,
     data.creative.body,
-    margin + 44,
+    margin,
     currentY,
-    width - margin * 2 - 88,
+    width - margin * 2,
     45,
     5
   );
 
   currentY += 58;
 
-  ctx.strokeStyle = "rgba(148, 163, 184, 0.28)";
+  ctx.strokeStyle = "#e3e8f2";
   ctx.beginPath();
-  ctx.moveTo(margin + 44, currentY);
-  ctx.lineTo(width - margin - 44, currentY);
+  ctx.moveTo(margin, currentY);
+  ctx.lineTo(width - margin, currentY);
   ctx.stroke();
 
-  currentY += 56;
+  currentY += 54;
 
-  ctx.fillStyle = "#F8FAFC";
+  ctx.fillStyle = "#070b18";
   ctx.font = "800 29px Arial";
-  ctx.fillText("Origem do dado", margin + 44, currentY);
+  ctx.fillText("Origem do dado", margin, currentY);
 
   currentY += 46;
 
-  ctx.fillStyle = "#CBD5E1";
+  ctx.fillStyle = "#667085";
   ctx.font = "400 25px Arial";
   ctx.fillText(
     `Categoria: ${normalizeLabel(data.source.upload?.category_label)}`,
-    margin + 44,
+    margin,
     currentY
   );
 
   currentY += 38;
-
   ctx.fillText(
-    `Relatório: ${normalizeLabel(
+    `Tipo: ${normalizeLabel(
       data.source.upload?.report_type || data.source.upload?.report_label
     )}`,
-    margin + 44,
+    margin,
     currentY
   );
 
   currentY += 38;
-
   drawWrappedText(
     ctx,
-    `Upload: ${normalizeLabel(data.source.upload?.file_name)}`,
-    margin + 44,
+    `Arquivo: ${normalizeLabel(data.source.upload?.file_name)}`,
+    margin,
     currentY,
-    width - margin * 2 - 88,
+    width - margin * 2,
     34,
     2
   );
 
-  ctx.fillStyle = accent;
-  ctx.fillRect(margin + 44, height - 214, width - margin * 2 - 88, 88);
+  ctx.fillStyle = "#111827";
+  ctx.fillRect(margin, height - 214, width - margin * 2, 88);
 
-  ctx.fillStyle = "#04111D";
+  ctx.fillStyle = "#ffffff";
   ctx.font = "800 28px Arial";
   drawWrappedText(
     ctx,
     data.creative.cta,
-    margin + 74,
+    margin + 30,
     height - 160,
-    width - margin * 2 - 148,
+    width - margin * 2 - 60,
     34,
     2
   );
 
-  ctx.fillStyle = "#A8B3C7";
+  ctx.fillStyle = "#667085";
   ctx.font = "400 22px Arial";
   ctx.fillText(
-    `${data.creative.footer} • Alerta ${data.alert_id.slice(0, 8)}`,
-    margin + 44,
+    `${data.creative.footer} - Alerta ${data.alert_id.slice(0, 8)}`,
+    margin,
     height - 78
   );
 }
@@ -338,7 +309,6 @@ function drawCreative(canvas: HTMLCanvasElement, data: CreativeResponse) {
 export default function CreativeByAlertPage() {
   const params = useParams<{ alertId: string }>();
   const alertId = params.alertId;
-
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const [creativeData, setCreativeData] = useState<CreativeResponse | null>(
@@ -399,8 +369,8 @@ export default function CreativeByAlertPage() {
   }
 
   return (
-    <div className="invest-page">
-      <section className="invest-page-hero p-6 md:p-8">
+    <div className="page-shell">
+      <section className="page-header p-6 md:p-8">
         <Link
           href={`/alerts/${alertId}`}
           className="invest-button-secondary mb-5 w-fit px-4 py-2 text-sm"
@@ -408,35 +378,35 @@ export default function CreativeByAlertPage() {
           Voltar para o alerta
         </Link>
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div>
-            <p className="invest-eyebrow">Ateliê de comunicação</p>
+            <p className="invest-eyebrow">Arte do alerta</p>
             <h1 className="invest-title mt-3 max-w-4xl text-3xl md:text-5xl">
-              Gere uma arte pública a partir de um alerta rastreável.
+              Gere uma peça clara, forte e rastreável.
             </h1>
             <p className="invest-subtitle mt-4 max-w-3xl text-base">
-              A IA gera somente o texto. O template visual é local, exportável
-              em PNG e mantém a origem do alerta visível.
+              A IA sugere texto. O canvas monta a arte localmente e o PNG não é
+              salvo no banco.
             </p>
           </div>
 
-          <div className="invest-card p-5">
-            <p className="invest-eyebrow">Fluxo</p>
+          <div className="rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)]">
+            <p className="invest-eyebrow">Passos</p>
             <div className="mt-4 space-y-3 text-sm text-[var(--invest-muted)]">
-              <p>1. Gerar texto responsável no backend.</p>
-              <p>2. Aplicar no canvas local.</p>
-              <p>3. Baixar PNG sem salvar arte no banco.</p>
+              <p>1. Gerar texto pelo backend.</p>
+              <p>2. Revisar a prévia.</p>
+              <p>3. Baixar PNG com origem visível.</p>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="invest-card p-5">
+      <section className="rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="invest-eyebrow">Controle</p>
-            <h2 className="mt-2 text-xl font-black text-white">
-              Gerador visual
+            <p className="invest-eyebrow">Workspace</p>
+            <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
+              Prévia da peça
             </h2>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -461,34 +431,32 @@ export default function CreativeByAlertPage() {
         </div>
 
         {errorMessage && (
-          <div className="mt-5 rounded-lg border border-[rgba(230,57,70,0.4)] bg-[rgba(230,57,70,0.1)] p-4 text-sm text-[#ffb4ba]">
+          <div className="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             {errorMessage}
           </div>
         )}
 
         {!creativeData && !errorMessage && (
-          <div className="mt-5 rounded-lg border border-[var(--invest-border)] bg-[rgba(3,7,18,0.28)] p-5 text-sm leading-6 text-[var(--invest-muted)]">
-            Clique em <strong className="text-white">Gerar arte</strong> para
-            montar o texto com IA e aplicar no template executivo.
+          <div className="mt-5 rounded-lg border border-[var(--invest-border)] bg-[#fbfcff] p-5 text-sm leading-6 text-[var(--invest-muted)]">
+            Clique em <strong className="text-[var(--invest-heading)]">Gerar arte</strong> para
+            montar uma peça vertical com título, valor, origem e chamada pública.
           </div>
         )}
 
         {creativeData && (
           <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-            <div className="rounded-lg border border-[var(--invest-border)] bg-[#030712] p-4">
-              <div className="invest-soft-scroll overflow-auto rounded-md bg-[rgba(255,255,255,0.03)] p-4">
+            <div className="rounded-lg border border-[var(--invest-border)] bg-[#f5f7fb] p-4">
+              <div className="invest-soft-scroll overflow-auto rounded-lg bg-white p-4 shadow-inner">
                 <canvas
                   ref={canvasRef}
-                  className="mx-auto w-full max-w-[560px] border border-[rgba(148,163,184,0.2)] bg-white"
+                  className="mx-auto w-full max-w-[560px] border border-[var(--invest-border)] bg-white"
                 />
               </div>
             </div>
 
             <aside className="space-y-4 text-sm">
-              <div className="invest-card-solid p-4">
-                <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
-                  Geração
-                </p>
+              <div className="rounded-lg border border-[var(--invest-border)] bg-white p-4">
+                <p className="metric-label">Geração</p>
                 <div className="mt-3">
                   <StatusPill tone={creativeData.ai_used ? "success" : "muted"}>
                     {creativeData.ai_used
@@ -498,57 +466,53 @@ export default function CreativeByAlertPage() {
                 </div>
               </div>
 
-              <div className="invest-card-solid p-4">
-                <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
-                  Textos da arte
-                </p>
+              <div className="rounded-lg border border-[var(--invest-border)] bg-white p-4">
+                <p className="metric-label">Textos da arte</p>
                 <div className="mt-4 space-y-3 text-[var(--invest-muted)]">
                   <p>
-                    <strong className="text-white">Título:</strong>{" "}
+                    <strong className="text-[var(--invest-heading)]">Título:</strong>{" "}
                     {creativeData.creative.title}
                   </p>
                   <p>
-                    <strong className="text-white">Subtítulo:</strong>{" "}
+                    <strong className="text-[var(--invest-heading)]">Subtítulo:</strong>{" "}
                     {creativeData.creative.subtitle}
                   </p>
                   <p>
-                    <strong className="text-white">Texto:</strong>{" "}
+                    <strong className="text-[var(--invest-heading)]">Texto:</strong>{" "}
                     {creativeData.creative.body}
                   </p>
                   <p>
-                    <strong className="text-white">CTA:</strong>{" "}
+                    <strong className="text-[var(--invest-heading)]">CTA:</strong>{" "}
                     {creativeData.creative.cta}
                   </p>
                 </div>
               </div>
 
-              <div className="invest-card-solid p-4">
-                <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
-                  Rastreabilidade
-                </p>
+              <div className="rounded-lg border border-[var(--invest-border)] bg-white p-4">
+                <p className="metric-label">Rastreabilidade</p>
                 <div className="mt-4 space-y-3 text-[var(--invest-muted)]">
                   <p>
-                    <strong className="text-white">Alerta:</strong>{" "}
+                    <strong className="text-[var(--invest-heading)]">Alerta:</strong>{" "}
                     {creativeData.alert_id}
                   </p>
                   <p>
-                    <strong className="text-white">Upload:</strong>{" "}
+                    <strong className="text-[var(--invest-heading)]">Upload:</strong>{" "}
                     {creativeData.upload_id || "Não informado"}
                   </p>
                   <p>
-                    <strong className="text-white">Registro origem:</strong>{" "}
+                    <strong className="text-[var(--invest-heading)]">Registro origem:</strong>{" "}
                     {creativeData.source_record_id || "Não vinculado"}
                   </p>
                   <p>
-                    <strong className="text-white">Categoria:</strong>{" "}
+                    <strong className="text-[var(--invest-heading)]">Categoria:</strong>{" "}
                     {normalizeLabel(creativeData.source.upload?.category_label)}
                   </p>
                   <p>
-                    <strong className="text-white">Fornecedor:</strong>{" "}
+                    <strong className="text-[var(--invest-heading)]">Fornecedor:</strong>{" "}
                     {normalizeLabel(creativeData.source.alert?.supplier_name)}
                   </p>
                   <p>
-                    <strong className="text-white">Severidade:</strong>{" "}
+                    <strong className="text-[var(--invest-heading)]">Severidade:</strong>{" "}
                     <StatusPill tone={severityTone(creativeData.source.alert?.severity)}>
                       {normalizeLabel(creativeData.source.alert?.severity)}
                     </StatusPill>
@@ -558,16 +522,13 @@ export default function CreativeByAlertPage() {
 
               {creativeData.source.raw_fields &&
                 Object.keys(creativeData.source.raw_fields).length > 0 && (
-                  <div className="invest-card-solid p-4">
-                    <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
-                      Campos de origem usados
-                    </p>
-
+                  <div className="rounded-lg border border-[var(--invest-border)] bg-white p-4">
+                    <p className="metric-label">Campos usados</p>
                     <div className="mt-4 space-y-3 text-[var(--invest-muted)]">
                       {Object.entries(creativeData.source.raw_fields).map(
                         ([key, value]) => (
                           <p key={key}>
-                            <strong className="text-white">{key}:</strong>{" "}
+                            <strong className="text-[var(--invest-heading)]">{key}:</strong>{" "}
                             {value}
                           </p>
                         )

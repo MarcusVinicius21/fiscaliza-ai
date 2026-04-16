@@ -14,7 +14,6 @@ interface Client {
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
-
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [document, setDocument] = useState("");
@@ -58,22 +57,21 @@ export default function ClientsPage() {
   };
 
   return (
-    <div className="invest-page">
-      <section className="invest-page-hero p-6 md:p-8">
-        <p className="invest-eyebrow">Gestão institucional</p>
+    <div className="page-shell">
+      <section className="page-header p-6 md:p-8">
+        <p className="invest-eyebrow">Clientes</p>
         <h1 className="invest-title mt-3 max-w-4xl text-3xl md:text-5xl">
-          Clientes com contexto claro para bases públicas.
+          Responsáveis por cada base monitorada.
         </h1>
         <p className="invest-subtitle mt-4 max-w-3xl text-base">
-          Cadastre responsáveis locais sem alterar a camada analítica. Esses
-          dados apoiam organização e leitura operacional.
+          Cadastre quem acompanha as cidades e arquivos sem mexer na análise.
         </p>
       </section>
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-        <form onSubmit={handleAddClient} className="invest-card p-5">
+        <form onSubmit={handleAddClient} className="rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)]">
           <p className="invest-eyebrow">Novo cliente</p>
-          <h2 className="mt-2 text-xl font-black text-white">
+          <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
             Cadastro rápido
           </h2>
           <div className="mt-6 space-y-4">
@@ -114,11 +112,11 @@ export default function ClientsPage() {
           </div>
         </form>
 
-        <section className="invest-card overflow-hidden">
+        <section className="overflow-hidden rounded-lg border border-[var(--invest-border)] bg-white shadow-[var(--invest-shadow-soft)]">
           <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--invest-border)] p-5">
             <div>
               <p className="invest-eyebrow">Carteira</p>
-              <h2 className="mt-2 text-xl font-black text-white">
+              <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
                 Clientes cadastrados
               </h2>
             </div>
@@ -135,7 +133,7 @@ export default function ClientsPage() {
                 Nenhum cliente cadastrado ainda.
               </p>
             ) : (
-              <table className="invest-table">
+              <table className="data-table">
                 <thead>
                   <tr>
                     <th>Nome</th>
@@ -146,7 +144,9 @@ export default function ClientsPage() {
                 <tbody>
                   {clients.map((client) => (
                     <tr key={client.id}>
-                      <td className="font-bold text-white">{client.name}</td>
+                      <td className="font-bold text-[var(--invest-heading)]">
+                        {client.name}
+                      </td>
                       <td>{client.email || "-"}</td>
                       <td>{client.document || "-"}</td>
                     </tr>

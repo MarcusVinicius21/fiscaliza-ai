@@ -8,6 +8,7 @@ import { SkeletonBlock } from "@/components/app/skeleton-block";
 import { supabase } from "@/lib/supabase";
 
 type JsonObject = Record<string, unknown>;
+type StatusTone = "info" | "danger" | "success" | "muted" | "warning";
 
 interface AlertRecord {
   id: string;
@@ -114,11 +115,9 @@ function formatMoney(value: number) {
 }
 
 function formatDate(value?: string | null) {
-  if (!value) return "—";
-
+  if (!value) return "-";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-
+  if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleDateString("pt-BR");
 }
 
@@ -140,12 +139,10 @@ function categoryLabel(value: string | null | undefined) {
   return map[String(value || "")] || normalizeLabel(value);
 }
 
-function severityTone(severity?: string | null) {
+function severityTone(severity?: string | null): StatusTone {
   const sev = String(severity || "").toLowerCase();
-
   if (sev.includes("alta")) return "danger";
   if (sev.includes("media") || sev.includes("média")) return "warning";
-
   return "info";
 }
 
@@ -179,6 +176,31 @@ function getRawValue(record: StandardizedRecord | null, keys: string[]) {
   }
 
   return "";
+}
+
+function parseDateLike(value: string) {
+  const text = value.trim();
+  if (!text) return null;
+
+  const br = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (br) {
+    const year = br[3].length === 2 ? `20${br[3]}` : br[3];
+    const date = new Date(Number(year), Number(br[2]) - 1, Number(br[1]));
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function estimateContractMonths(record: StandardizedRecord | null) {
+  const start = parseDateLike(getRawValue(record, ["inicio_vigencia"]));
+  const end = parseDateLike(getRawValue(record, ["termino_vigencia"]));
+
+  if (!start || !end || end <= start) return 0;
+
+  const days = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+  return Math.max(1, Math.round(days / 30.44));
 }
 
 function roundMoney(value: unknown) {
@@ -429,46 +451,49 @@ export default function AlertDetailPage() {
   );
 
   const resumoContextual = useMemo(
-    () => parseJson(inputSummary.resumo_contextual),
+    () => parseJson(inputSummary["resumo_contextual"]),
     [inputSummary]
   );
 
-  const aiAlerts = asRecordArray(aiOutput.alertas);
+  const aiAlerts = asRecordArray(aiOutput["alertas"]);
   const matchedAiAlert = findMatchingAiAlert(alert, aiAlerts);
 
   const firstRecord = records[0] || null;
   const rawEntries = rawPreviewEntries(firstRecord);
 
   const alertAmount = parseAmount(alert?.amount);
-  const totalUpload = parseAmount(inputSummary.valor_total_soma);
+  const totalUpload = parseAmount(inputSummary["valor_total_soma"]);
   const percentOfUpload =
     totalUpload > 0 ? (alertAmount / totalUpload) * 100 : 0;
 
-  const topConcentracao = asRecordArray(inputSummary.top_5_concentracao_volume);
+  const months = estimateContractMonths(firstRecord);
+  const monthlyEstimate = months > 0 ? alertAmount / months : 0;
+
+  const topConcentracao = asRecordArray(inputSummary["top_5_concentracao_volume"]);
   const supplierContext =
     topConcentracao.find(
       (item) =>
-        normalizeText(item.nome_credor_servidor) ===
+        normalizeText(item["nome_credor_servidor"]) ===
         normalizeText(alert?.supplier_name)
     ) || null;
 
   const supplierTotal = parseAmount(
-    supplierContext?.valor_bruto ?? supplierContext?.valor_total
+    supplierContext?.["valor_bruto"] ?? supplierContext?.["valor_total"]
   );
 
   const supplierPercent =
     totalUpload > 0 ? (supplierTotal / totalUpload) * 100 : 0;
 
   const repeatedContext =
-    asRecordArray(inputSummary.alerta_potencial_repeticao_contratual).length ||
-    asRecordArray(inputSummary.alerta_potencial_duplicidade).length;
+    asRecordArray(inputSummary["alerta_potencial_repeticao_contratual"]).length ||
+    asRecordArray(inputSummary["alerta_potencial_duplicidade"]).length;
 
   if (loading) {
     return (
-      <div className="invest-page">
-        <section className="invest-page-hero p-6">
-          <p className="invest-eyebrow">Detalhe do alerta</p>
-          <h1 className="invest-title mt-3 text-3xl">Carregando evidência</h1>
+      <div className="page-shell">
+        <section className="page-header p-6">
+          <p className="invest-eyebrow">Detalhe</p>
+          <h1 className="invest-title mt-3 text-3xl">Carregando alerta</h1>
           <div className="mt-6 max-w-xl">
             <SkeletonBlock lines={4} />
           </div>
@@ -479,12 +504,12 @@ export default function AlertDetailPage() {
 
   if (errorMessage) {
     return (
-      <div className="invest-page">
+      <div className="page-shell">
         <Link href="/alerts" className="invest-button-secondary w-fit px-4 py-2 text-sm">
           Voltar para alertas
         </Link>
 
-        <div className="rounded-lg border border-[rgba(230,57,70,0.4)] bg-[rgba(230,57,70,0.1)] p-4 text-sm text-[#ffb4ba]">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {errorMessage}
         </div>
       </div>
@@ -493,12 +518,12 @@ export default function AlertDetailPage() {
 
   if (!alert) {
     return (
-      <div className="invest-page">
+      <div className="page-shell">
         <Link href="/alerts" className="invest-button-secondary w-fit px-4 py-2 text-sm">
           Voltar para alertas
         </Link>
 
-        <div className="invest-card p-5 text-sm text-[var(--invest-muted)]">
+        <div className="rounded-lg border border-[var(--invest-border)] bg-white p-5 text-sm text-[var(--invest-muted)]">
           Alerta não encontrado.
         </div>
       </div>
@@ -506,9 +531,9 @@ export default function AlertDetailPage() {
   }
 
   return (
-    <div className="invest-page">
-      <section className="invest-page-hero p-6 md:p-8">
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+    <div className="page-shell">
+      <section className="page-header p-6 md:p-8">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
           <div>
             <Link href="/alerts" className="invest-button-secondary mb-5 w-fit px-4 py-2 text-sm">
               Voltar para alertas
@@ -518,11 +543,12 @@ export default function AlertDetailPage() {
               <StatusPill tone={severityTone(alert.severity)}>
                 {alert.severity || "baixa"}
               </StatusPill>
-              <span className="invest-chip">{categoryLabel(alert.category)}</span>
-              <span className="invest-chip">{formatDate(alert.created_at)}</span>
+              <span className="app-chip">{categoryLabel(alert.category)}</span>
+              <span className="app-chip">{formatDate(alert.created_at)}</span>
             </div>
 
-            <h1 className="invest-title mt-5 max-w-4xl text-3xl md:text-5xl">
+            <p className="invest-eyebrow mt-6">O que foi encontrado</p>
+            <h1 className="invest-title mt-3 max-w-4xl text-3xl md:text-5xl">
               {alert.title}
             </h1>
 
@@ -531,14 +557,14 @@ export default function AlertDetailPage() {
             </p>
           </div>
 
-          <aside className="invest-card p-5">
-            <p className="invest-eyebrow">Ação pública</p>
-            <h2 className="mt-2 text-lg font-black text-white">
-              Comunicação rastreável
+          <aside className="rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)]">
+            <p className="invest-eyebrow">Ação</p>
+            <h2 className="mt-2 text-lg font-black text-[var(--invest-heading)]">
+              Transformar em arte
             </h2>
             <p className="mt-3 text-sm leading-6 text-[var(--invest-muted)]">
-              Gere uma arte apenas com base no alerta e no contexto já
-              persistido.
+              Gere uma peça visual com base apenas neste alerta e na origem
+              preservada.
             </p>
             <Link
               href={`/creatives/${alert.id}`}
@@ -551,56 +577,99 @@ export default function AlertDetailPage() {
       </section>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <div className="invest-kpi">
-          <p className="text-xs font-bold text-[var(--invest-muted)]">
-            Valor do alerta
-          </p>
-          <p className="invest-number mt-2 text-2xl font-black text-white">
-            {formatMoney(alertAmount)}
-          </p>
+        <div className="metric-card">
+          <p className="metric-label">Valor do alerta</p>
+          <p className="metric-value mt-3">{formatMoney(alertAmount)}</p>
         </div>
-
-        <div className="invest-kpi">
-          <p className="text-xs font-bold text-[var(--invest-muted)]">
-            Fornecedor
+        <div className="metric-card">
+          <p className="metric-label">Valor mensal estimado</p>
+          <p className="metric-value mt-3">
+            {monthlyEstimate > 0 ? formatMoney(monthlyEstimate) : "Não informado"}
           </p>
-          <p className="mt-2 text-lg font-black text-white">
+          {months > 0 && (
+            <p className="mt-2 text-xs text-[var(--invest-muted)]">
+              Estimado por {months} meses de vigência.
+            </p>
+          )}
+        </div>
+        <div className="metric-card">
+          <p className="metric-label">Fornecedor</p>
+          <p className="mt-3 text-lg font-black text-[var(--invest-heading)]">
             {alert.supplier_name || "Não informado"}
           </p>
         </div>
-
-        <div className="invest-kpi">
-          <p className="text-xs font-bold text-[var(--invest-muted)]">Cidade</p>
-          <p className="mt-2 text-lg font-black text-white">
+        <div className="metric-card">
+          <p className="metric-label">Cidade</p>
+          <p className="mt-3 text-lg font-black text-[var(--invest-heading)]">
             {alert.cities?.name
               ? `${alert.cities.name}/${alert.cities.state}`
               : "Não informada"}
           </p>
         </div>
+      </section>
 
-        <div className="invest-kpi">
-          <p className="text-xs font-bold text-[var(--invest-muted)]">
-            Registros relacionados
-          </p>
-          <p className="invest-number mt-2 text-2xl font-black text-white">
-            {records.length}
-          </p>
-        </div>
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <article className="evidence-card p-6">
+          <p className="invest-eyebrow">Por que isso preocupa</p>
+          <h2 className="mt-2 text-2xl font-black text-[var(--invest-heading)]">
+            O valor representa {formatPercent(percentOfUpload)} do total analisado.
+          </h2>
+          <div className="mt-5 space-y-3 text-sm leading-7 text-[var(--invest-muted)]">
+            <p>
+              Este alerta merece apuração porque concentra valor relevante em
+              uma linha, fornecedor ou padrão identificado na análise já salva.
+            </p>
+            <p>
+              A tela não afirma crime. Ela mostra por que o dado exige
+              explicação e onde conferir a origem.
+            </p>
+          </div>
+        </article>
+
+        <aside className="rounded-lg border border-[var(--invest-border)] bg-white p-6 shadow-[var(--invest-shadow-soft)]">
+          <p className="invest-eyebrow">Quanto isso representa</p>
+          <div className="mt-5 space-y-4 text-sm">
+            <div className="flex items-center justify-between border-b border-[var(--invest-border)] pb-3">
+              <span className="text-[var(--invest-muted)]">Total do upload</span>
+              <span className="invest-number font-black text-[var(--invest-heading)]">
+                {formatMoney(totalUpload)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between border-b border-[var(--invest-border)] pb-3">
+              <span className="text-[var(--invest-muted)]">Valor do alerta</span>
+              <span className="invest-number font-black text-[var(--invest-heading)]">
+                {formatMoney(alertAmount)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between border-b border-[var(--invest-border)] pb-3">
+              <span className="text-[var(--invest-muted)]">Total do fornecedor</span>
+              <span className="invest-number font-black text-[var(--invest-heading)]">
+                {supplierTotal > 0 ? formatMoney(supplierTotal) : "Não encontrado"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[var(--invest-muted)]">Peso do fornecedor</span>
+              <span className="invest-number font-black text-[var(--invest-heading)]">
+                {supplierTotal > 0 ? formatPercent(supplierPercent) : "Não calculado"}
+              </span>
+            </div>
+          </div>
+        </aside>
       </section>
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <div className="invest-card p-6">
+        <div className="rounded-lg border border-[var(--invest-border)] bg-white p-6 shadow-[var(--invest-shadow-soft)]">
           <p className="invest-eyebrow">Origem</p>
-          <h2 className="mt-2 text-xl font-black text-white">
-            Upload que gerou o alerta
+          <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
+            Arquivo que gerou o alerta
           </h2>
 
           <dl className="mt-5 grid grid-cols-1 gap-3 text-sm">
             {[
               ["Upload", upload?.file_name || "Upload não encontrado"],
-              ["Categoria", categoryLabel(upload?.category || alert.category)],
+              ["Categoria do arquivo", categoryLabel(upload?.category || alert.category)],
               [
-                "Relatório",
+                "Tipo do documento",
                 upload?.report_type ||
                   upload?.report_label ||
                   alert.report_type ||
@@ -610,16 +679,16 @@ export default function AlertDetailPage() {
               ["Status do upload", upload?.status || "Não informado"],
               ["Status da análise", upload?.analysis_status || "Não informado"],
               ["Data do upload", formatDate(upload?.created_at)],
-              ["Source record ID", alert.source_record_id || "Não vinculado"],
+              ["Registro de origem", alert.source_record_id || "Não vinculado"],
             ].map(([label, value]) => (
               <div
                 key={label}
-                className="rounded-lg border border-[var(--invest-border)] bg-[rgba(3,7,18,0.28)] p-3"
+                className="rounded-lg border border-[var(--invest-border)] bg-[#fbfcff] p-3"
               >
                 <dt className="text-xs font-black uppercase tracking-[0.1em] text-[var(--invest-faint)]">
                   {label}
                 </dt>
-                <dd className="mt-1 break-words font-bold text-white">
+                <dd className="mt-1 break-words font-bold text-[var(--invest-heading)]">
                   {value}
                 </dd>
               </div>
@@ -627,44 +696,42 @@ export default function AlertDetailPage() {
           </dl>
         </div>
 
-        <div className="invest-card p-6">
-          <p className="invest-eyebrow">Apoio da IA</p>
-          <h2 className="mt-2 text-xl font-black text-white">
-            Resumo explicativo
+        <div className="rounded-lg border border-[var(--invest-border)] bg-white p-6 shadow-[var(--invest-shadow-soft)]">
+          <p className="invest-eyebrow">Resumo técnico</p>
+          <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
+            Apoio da IA já salvo
           </h2>
 
           <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <div className="invest-evidence rounded-lg p-4">
-              <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-cyan)]">
-                Resumo contextual da IA
+            <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-blue-700">
+                O que chama atenção
               </p>
-              <p className="mt-3 text-sm leading-7 text-[#dbe6f3]">
-                {displayValue(aiOutput.resumo_contextual_ia) ||
-                  "Resumo contextual indisponível."}
+              <p className="mt-3 text-sm leading-7 text-blue-950">
+                {displayValue(aiOutput["resumo_contextual_ia"])}
               </p>
             </div>
 
-            <div className="rounded-lg border border-[var(--invest-border)] bg-[rgba(3,7,18,0.28)] p-4">
+            <div className="rounded-lg border border-[var(--invest-border)] bg-[#fbfcff] p-4">
               <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
-                Resumo interpretativo
+                Resumo da análise
               </p>
-              <p className="mt-3 text-sm leading-7 text-[#dbe6f3]">
-                {displayValue(aiOutput.resumo_interpretativo) ||
-                  "Resumo interpretativo indisponível."}
+              <p className="mt-3 text-sm leading-7 text-[var(--invest-muted)]">
+                {displayValue(aiOutput["resumo_interpretativo"])}
               </p>
             </div>
           </div>
 
           {matchedAiAlert && (
-            <div className="mt-4 rounded-lg border border-[rgba(245,184,75,0.32)] bg-[rgba(245,184,75,0.08)] p-4">
-              <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-warning)]">
-                Alerta correspondente no retorno da IA
+            <div className="mt-4 rounded-lg border border-orange-200 bg-orange-50 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-orange-700">
+                Motivo do alerta
               </p>
-              <p className="mt-2 font-black text-white">
-                {displayValue(matchedAiAlert.title)}
+              <p className="mt-2 font-black text-orange-950">
+                {displayValue(matchedAiAlert["title"])}
               </p>
-              <p className="mt-2 text-sm leading-6 text-[var(--invest-muted)]">
-                {displayValue(matchedAiAlert.explanation)}
+              <p className="mt-2 text-sm leading-6 text-orange-900">
+                {displayValue(matchedAiAlert["explanation"])}
               </p>
             </div>
           )}
@@ -672,121 +739,79 @@ export default function AlertDetailPage() {
       </section>
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <div className="invest-card p-6">
-          <p className="invest-eyebrow">Comparação</p>
-          <h2 className="mt-2 text-xl font-black text-white">
-            Proporção no upload analisado
-          </h2>
-
-          <div className="mt-5 space-y-4 text-sm">
-            <div className="flex items-center justify-between border-b border-[var(--invest-border)] pb-3">
-              <span className="text-[var(--invest-muted)]">Total analisado</span>
-              <span className="invest-number font-black text-white">
-                {formatMoney(totalUpload)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between border-b border-[var(--invest-border)] pb-3">
-              <span className="text-[var(--invest-muted)]">Valor deste alerta</span>
-              <span className="invest-number font-black text-white">
-                {formatMoney(alertAmount)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between border-b border-[var(--invest-border)] pb-3">
-              <span className="text-[var(--invest-muted)]">Participação no total</span>
-              <span className="invest-number font-black text-white">
-                {formatPercent(percentOfUpload)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between border-b border-[var(--invest-border)] pb-3">
-              <span className="text-[var(--invest-muted)]">Total do fornecedor</span>
-              <span className="invest-number font-black text-white">
-                {supplierTotal > 0 ? formatMoney(supplierTotal) : "Não encontrado"}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[var(--invest-muted)]">Participação do fornecedor</span>
-              <span className="invest-number font-black text-white">
-                {supplierTotal > 0 ? formatPercent(supplierPercent) : "Não calculada"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="invest-card-highlight p-6">
-          <p className="invest-eyebrow">Motivação</p>
-          <h2 className="mt-2 text-xl font-black text-white">
-            Por que isto apareceu
+        <div className="rounded-lg border border-[var(--invest-border)] bg-white p-6 shadow-[var(--invest-shadow-soft)]">
+          <p className="invest-eyebrow">Sinais de atenção</p>
+          <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
+            Por que apareceu na análise
           </h2>
 
           <div className="mt-5 space-y-4 text-sm leading-6 text-[var(--invest-muted)]">
             <p>
-              O alerta foi gerado a partir da análise já salva na Etapa 5 para o
-              upload de origem.
+              O alerta veio da análise já salva para este upload. Esta tela só
+              cruza o alerta com a origem e os registros relacionados.
             </p>
             <p>
-              <strong className="text-white">Tipo de contexto técnico:</strong>{" "}
-              {normalizeLabel(resumoContextual.tipo_contexto)}
+              <strong className="text-[var(--invest-heading)]">Categoria lida:</strong>{" "}
+              {categoryLabel(String(resumoContextual["tipo_contexto"] || upload?.category || alert.category))}
             </p>
             <p>
-              <strong className="text-white">Repetições analíticas relevantes:</strong>{" "}
+              <strong className="text-[var(--invest-heading)]">Sinais parecidos no arquivo:</strong>{" "}
               {repeatedContext}
             </p>
             <p>
-              <strong className="text-white">Registros candidatos encontrados:</strong>{" "}
+              <strong className="text-[var(--invest-heading)]">Registros candidatos encontrados:</strong>{" "}
               {records.length}
             </p>
-            <p>
-              Esta tela não recalcula a análise. Ela apenas mostra origem,
-              contexto e evidência do alerta já gerado.
-            </p>
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-lg border border-[var(--invest-border)] bg-white shadow-[var(--invest-shadow-soft)]">
+          <div className="border-b border-[var(--invest-border)] p-5">
+            <p className="invest-eyebrow">Registros</p>
+            <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
+              Linhas relacionadas
+            </h2>
+          </div>
+
+          <div className="invest-soft-scroll overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Fornecedor / nome</th>
+                  <th>Documento</th>
+                  <th className="text-right">Valor</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {records.map((record) => (
+                  <tr key={record.id}>
+                    <td>{normalizeLabel(record.nome_credor_servidor)}</td>
+                    <td>{normalizeLabel(record.documento)}</td>
+                    <td className="text-right invest-number font-bold">
+                      {formatMoney(parseAmount(record.valor_bruto))}
+                    </td>
+                  </tr>
+                ))}
+
+                {records.length === 0 && (
+                  <tr>
+                    <td colSpan={3}>Nenhum registro relacionado encontrado.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
 
-      <section className="invest-card overflow-hidden">
-        <div className="border-b border-[var(--invest-border)] p-5">
-          <p className="invest-eyebrow">Evidências</p>
-          <h2 className="mt-2 text-xl font-black text-white">
-            Registros relacionados
-          </h2>
-        </div>
-
-        <div className="invest-soft-scroll overflow-x-auto">
-          <table className="invest-table">
-            <thead>
-              <tr>
-                <th>Fornecedor / nome</th>
-                <th>Documento</th>
-                <th className="text-right">Valor</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {records.map((record) => (
-                <tr key={record.id}>
-                  <td>{normalizeLabel(record.nome_credor_servidor)}</td>
-                  <td>{normalizeLabel(record.documento)}</td>
-                  <td className="text-right invest-number">
-                    {formatMoney(parseAmount(record.valor_bruto))}
-                  </td>
-                </tr>
-              ))}
-
-              {records.length === 0 && (
-                <tr>
-                  <td colSpan={3}>Nenhum registro relacionado encontrado.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="invest-card p-6">
-        <p className="invest-eyebrow">Prova de origem</p>
-        <h2 className="mt-2 text-xl font-black text-white">Origem do dado</h2>
+      <section className="rounded-lg border border-[var(--invest-border)] bg-white p-6 shadow-[var(--invest-shadow-soft)]">
+        <p className="invest-eyebrow">Provas e origem</p>
+        <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
+          Dados preservados do arquivo
+        </h2>
         <p className="mt-2 text-sm leading-6 text-[var(--invest-muted)]">
-          Campos abaixo foram extraídos do `raw_json` preservado no ETL.
+          Campos abaixo vêm do raw_json preservado no ETL.
         </p>
 
         {rawEntries.length > 0 ? (
@@ -794,12 +819,12 @@ export default function AlertDetailPage() {
             {rawEntries.map((entry) => (
               <div
                 key={entry.label}
-                className="rounded-lg border border-[var(--invest-border)] bg-[rgba(3,7,18,0.34)] p-4"
+                className="rounded-lg border border-[var(--invest-border)] bg-[#fbfcff] p-4"
               >
                 <dt className="text-xs font-black uppercase tracking-[0.1em] text-[var(--invest-faint)]">
                   {entry.label}
                 </dt>
-                <dd className="mt-2 break-words text-sm font-bold text-white">
+                <dd className="mt-2 break-words text-sm font-bold text-[var(--invest-heading)]">
                   {entry.value}
                 </dd>
               </div>
@@ -812,11 +837,11 @@ export default function AlertDetailPage() {
         )}
 
         {firstRecord && (
-          <details className="mt-5 rounded-lg border border-[var(--invest-border)] bg-[rgba(3,7,18,0.42)] p-4">
-            <summary className="font-bold text-white">
+          <details className="mt-5 rounded-lg border border-[var(--invest-border)] bg-[#fbfcff] p-4">
+            <summary className="font-bold text-[var(--invest-heading)]">
               Ver raw_json completo do primeiro registro relacionado
             </summary>
-            <pre className="invest-soft-scroll mt-4 max-h-[520px] overflow-auto rounded-lg border border-[var(--invest-border)] bg-[#030712] p-4 text-xs leading-5 text-[#dbe6f3]">
+            <pre className="invest-soft-scroll mt-4 max-h-[520px] overflow-auto rounded-lg border border-[var(--invest-border)] bg-white p-4 text-xs leading-5 text-[var(--invest-text)]">
               {JSON.stringify(getRawDict(firstRecord), null, 2)}
             </pre>
           </details>
