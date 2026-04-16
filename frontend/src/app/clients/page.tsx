@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { StatusPill } from "@/components/app/status-pill";
 import { supabase } from "@/lib/supabase";
 
 interface Client {
@@ -14,12 +15,10 @@ export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Estados do formulário
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [document, setDocument] = useState("");
 
-  // Buscar clientes ao montar o componente
   useEffect(() => {
     fetchClients();
   }, []);
@@ -41,9 +40,9 @@ export default function ClientsPage() {
 
   const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const { error } = await supabase.from("clients").insert([
-      { name, email, document }
+      { name, email, document },
     ]);
 
     if (error) {
@@ -52,7 +51,6 @@ export default function ClientsPage() {
       return;
     }
 
-    // Limpar formulário e recarregar lista
     setName("");
     setEmail("");
     setDocument("");
@@ -60,87 +58,105 @@ export default function ClientsPage() {
   };
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-gray-800">Gestão de Clientes</h1>
+    <div className="invest-page">
+      <section className="invest-page-hero p-6 md:p-8">
+        <p className="invest-eyebrow">Gestão institucional</p>
+        <h1 className="invest-title mt-3 max-w-4xl text-3xl md:text-5xl">
+          Clientes com contexto claro para bases públicas.
+        </h1>
+        <p className="invest-subtitle mt-4 max-w-3xl text-base">
+          Cadastre responsáveis locais sem alterar a camada analítica. Esses
+          dados apoiam organização e leitura operacional.
+        </p>
+      </section>
 
-      {/* Formulário de Cadastro */}
-      <div className="p-6 bg-white border rounded shadow-sm">
-        <h2 className="text-lg font-medium mb-4">Novo Cliente</h2>
-        <form onSubmit={handleAddClient} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-          <div className="col-span-1 md:col-span-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border rounded focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Ex: Prefeito João"
-            />
-          </div>
-          <div className="col-span-1 md:col-span-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border rounded focus:ring-blue-500 focus:border-blue-500"
-              placeholder="contato@cliente.com"
-            />
-          </div>
-          <div className="col-span-1 md:col-span-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Documento (CPF/CNPJ)</label>
-            <input
-              type="text"
-              value={document}
-              onChange={(e) => setDocument(e.target.value)}
-              className="w-full px-3 py-2 border rounded focus:ring-blue-500 focus:border-blue-500"
-              placeholder="000.000.000-00"
-            />
-          </div>
-          <div className="col-span-1 md:col-span-1">
-            <button
-              type="submit"
-              className="w-full px-4 py-2 text-white bg-blue-600 rounded hover:bg-blue-700"
-            >
-              Cadastrar
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+        <form onSubmit={handleAddClient} className="invest-card p-5">
+          <p className="invest-eyebrow">Novo cliente</p>
+          <h2 className="mt-2 text-xl font-black text-white">
+            Cadastro rápido
+          </h2>
+          <div className="mt-6 space-y-4">
+            <div>
+              <label className="invest-label">Nome</label>
+              <input
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="invest-input"
+                placeholder="Ex: Gabinete técnico"
+              />
+            </div>
+            <div>
+              <label className="invest-label">E-mail</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="invest-input"
+                placeholder="contato@cliente.com"
+              />
+            </div>
+            <div>
+              <label className="invest-label">Documento CPF/CNPJ</label>
+              <input
+                type="text"
+                value={document}
+                onChange={(e) => setDocument(e.target.value)}
+                className="invest-input"
+                placeholder="000.000.000-00"
+              />
+            </div>
+            <button type="submit" className="invest-button w-full px-4 py-2">
+              Cadastrar cliente
             </button>
           </div>
         </form>
-      </div>
 
-      {/* Listagem de Clientes */}
-      <div className="bg-white border rounded shadow-sm overflow-hidden">
-        <div className="p-4 border-b bg-gray-50">
-          <h2 className="text-lg font-medium">Clientes Cadastrados</h2>
-        </div>
-        <div className="p-0">
-          {loading ? (
-            <p className="p-6 text-gray-500">Carregando...</p>
-          ) : clients.length === 0 ? (
-            <p className="p-6 text-gray-500">Nenhum cliente cadastrado ainda.</p>
-          ) : (
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50 border-b">
-                  <th className="p-4 font-medium text-sm text-gray-600">Nome</th>
-                  <th className="p-4 font-medium text-sm text-gray-600">E-mail</th>
-                  <th className="p-4 font-medium text-sm text-gray-600">Documento</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clients.map((client) => (
-                  <tr key={client.id} className="border-b hover:bg-gray-50">
-                    <td className="p-4 text-sm text-gray-800">{client.name}</td>
-                    <td className="p-4 text-sm text-gray-600">{client.email || "-"}</td>
-                    <td className="p-4 text-sm text-gray-600">{client.document || "-"}</td>
+        <section className="invest-card overflow-hidden">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--invest-border)] p-5">
+            <div>
+              <p className="invest-eyebrow">Carteira</p>
+              <h2 className="mt-2 text-xl font-black text-white">
+                Clientes cadastrados
+              </h2>
+            </div>
+            <StatusPill tone="muted">{clients.length} registros</StatusPill>
+          </div>
+
+          <div className="invest-soft-scroll overflow-x-auto">
+            {loading ? (
+              <p className="p-6 text-sm text-[var(--invest-muted)]">
+                Carregando...
+              </p>
+            ) : clients.length === 0 ? (
+              <p className="p-6 text-sm text-[var(--invest-muted)]">
+                Nenhum cliente cadastrado ainda.
+              </p>
+            ) : (
+              <table className="invest-table">
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>E-mail</th>
+                    <th>Documento</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+                </thead>
+                <tbody>
+                  {clients.map((client) => (
+                    <tr key={client.id}>
+                      <td className="font-bold text-white">{client.name}</td>
+                      <td>{client.email || "-"}</td>
+                      <td>{client.document || "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </section>
+      </section>
     </div>
   );
 }

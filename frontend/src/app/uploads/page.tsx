@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FaqBlock } from "@/components/app/faq-block";
 import { InlineToast } from "@/components/app/inline-toast";
 import { StatusPill } from "@/components/app/status-pill";
@@ -32,7 +32,6 @@ interface UploadRecord {
   cities: { name: string; state: string } | null;
 }
 
-// Subtipos dependendo da categoria
 const REPORT_TYPES: Record<string, { id: string; label: string }[]> = {
   payroll: [
     { id: "servidores", label: "Lista de Servidores" },
@@ -54,6 +53,10 @@ function statusTone(status?: string) {
   return "muted";
 }
 
+function categoryLabel(value?: string) {
+  return categoryInfo[value as UploadCategory]?.label || value || "Sem categoria";
+}
+
 export default function UploadsPage() {
   const [cities, setCities] = useState<City[]>([]);
   const [uploads, setUploads] = useState<UploadRecord[]>([]);
@@ -61,7 +64,6 @@ export default function UploadsPage() {
   const [uploading, setUploading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
 
-  // Estados do formulário
   const [cityId, setCityId] = useState("");
   const [category, setCategory] = useState("");
   const [reportType, setReportType] = useState("");
@@ -182,7 +184,7 @@ export default function UploadsPage() {
           `Sucesso! Status: ${data.mapping_source}. Linhas salvas: ${data.linhas_processadas}`
         );
       else alert(`Erro: ${data.detail}`);
-    } catch (error) {
+    } catch {
       alert("Erro de conexão com o Backend Python na porta 8000.");
     } finally {
       fetchUploads();
@@ -213,26 +215,60 @@ export default function UploadsPage() {
   };
 
   const currentReportTypes = REPORT_TYPES[category] || REPORT_TYPES.default;
+  const processedCount = uploads.filter((item) => item.status === "processed").length;
+  const analyzedCount = uploads.filter((item) => item.analysis_status === "analyzed").length;
 
   return (
-    <div className="space-y-8">
-      <header className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.18em] text-[#4EA8DE]">
-          Entrada de dados
-        </p>
-        <h1 className="text-2xl font-bold text-white">Upload investigativo</h1>
-        <p className="max-w-3xl text-sm text-[#CBD5E1]">
-          Envie bases públicas com contexto claro. O wizard ajuda a escolher a
-          categoria certa sem alterar o ETL validado.
-        </p>
-      </header>
+    <div className="invest-page">
+      <section className="invest-page-hero p-6 md:p-8">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+          <div>
+            <p className="invest-eyebrow">Entrada de dados</p>
+            <h1 className="invest-title mt-3 max-w-3xl text-3xl md:text-5xl">
+              Upload investigativo com orientação de categoria.
+            </h1>
+            <p className="invest-subtitle mt-4 max-w-3xl text-base">
+              Envie bases públicas com contexto claro. O wizard melhora a
+              escolha da categoria e preserva integralmente o fluxo validado de
+              upload, processamento e análise.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="invest-kpi">
+              <p className="text-xs font-bold text-[var(--invest-muted)]">
+                Cidades
+              </p>
+              <p className="invest-number mt-2 text-2xl font-black text-white">
+                {cities.length}
+              </p>
+            </div>
+            <div className="invest-kpi">
+              <p className="text-xs font-bold text-[var(--invest-muted)]">
+                Processados
+              </p>
+              <p className="invest-number mt-2 text-2xl font-black text-white">
+                {processedCount}
+              </p>
+            </div>
+            <div className="invest-kpi">
+              <p className="text-xs font-bold text-[var(--invest-muted)]">
+                Analisados
+              </p>
+              <p className="invest-number mt-2 text-2xl font-black text-white">
+                {analyzedCount}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {statusMessage && (
         <InlineToast title="Status operacional" message={statusMessage} />
       )}
 
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_360px]">
-        <div className="space-y-4">
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="space-y-6">
           <CategoryWizard
             currentStep={wizardStep}
             file={file}
@@ -246,110 +282,120 @@ export default function UploadsPage() {
             }}
           />
 
-          <form
-            onSubmit={handleUpload}
-            className="grid grid-cols-1 gap-4 rounded-md border border-[#2D3748] bg-[#141B2D] p-5 md:grid-cols-2 xl:grid-cols-5"
-          >
-            <div>
-              <label className="mb-1 block text-sm font-medium text-[#CBD5E1]">
-                Cidade *
-              </label>
-              <select
-                required
-                value={cityId}
-                onChange={(e) => setCityId(e.target.value)}
-                className="invest-input w-full px-3 py-2"
-              >
-                <option value="" disabled>
-                  Selecione...
-                </option>
-                {cities.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
+          <form onSubmit={handleUpload} className="invest-card p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="invest-eyebrow">Formulário operacional</p>
+                <h2 className="mt-2 text-xl font-black text-white">
+                  Dados mínimos para entrada segura
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-[var(--invest-muted)]">
+                  Os campos abaixo mantêm o mesmo payload usado pelo backend.
+                </p>
+              </div>
+              <StatusPill tone={uploading ? "warning" : "info"}>
+                {uploading ? "Enviando" : "Pronto para envio"}
+              </StatusPill>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <div>
+                <label className="invest-label">Cidade *</label>
+                <select
+                  required
+                  value={cityId}
+                  onChange={(e) => setCityId(e.target.value)}
+                  className="invest-select"
+                >
+                  <option value="" disabled>
+                    Selecione a cidade
                   </option>
-                ))}
-              </select>
-            </div>
+                  {cities.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <div>
-              <label className="mb-1 block text-sm font-medium text-[#CBD5E1]">
-                Categoria *
-              </label>
-              <select
-                required
-                value={category}
-                onChange={(e) => {
-                  setCategory(e.target.value);
-                  setReportType("");
-                  setWizardStep(2);
-                }}
-                className="invest-input w-full px-3 py-2"
-              >
-                <option value="" disabled>
-                  Selecione...
-                </option>
-                {(Object.keys(categoryInfo) as UploadCategory[]).map((key) => (
-                  <option key={key} value={key}>
-                    {categoryInfo[key].label}
+              <div>
+                <label className="invest-label">Categoria *</label>
+                <select
+                  required
+                  value={category}
+                  onChange={(e) => {
+                    setCategory(e.target.value);
+                    setReportType("");
+                    setWizardStep(2);
+                  }}
+                  className="invest-select"
+                >
+                  <option value="" disabled>
+                    Selecione a categoria
                   </option>
-                ))}
-              </select>
-            </div>
+                  {(Object.keys(categoryInfo) as UploadCategory[]).map((key) => (
+                    <option key={key} value={key}>
+                      {categoryInfo[key].label}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <div>
-              <label className="mb-1 block text-sm font-medium text-[#CBD5E1]">
-                Relatório (Subtipo) *
-              </label>
-              <select
-                required
-                disabled={!category}
-                value={reportType}
-                onChange={(e) => setReportType(e.target.value)}
-                className="invest-input w-full px-3 py-2 disabled:opacity-50"
-              >
-                <option value="" disabled>
-                  Selecione...
-                </option>
-                {currentReportTypes.map((rt) => (
-                  <option key={rt.id} value={rt.id}>
-                    {rt.label}
+              <div>
+                <label className="invest-label">Relatório *</label>
+                <select
+                  required
+                  disabled={!category}
+                  value={reportType}
+                  onChange={(e) => setReportType(e.target.value)}
+                  className="invest-select disabled:opacity-50"
+                >
+                  <option value="" disabled>
+                    Selecione o subtipo
                   </option>
-                ))}
-              </select>
+                  {currentReportTypes.map((rt) => (
+                    <option key={rt.id} value={rt.id}>
+                      {rt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="invest-label">Rótulo opcional</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Jan a Mar/2026"
+                  value={reportLabel}
+                  onChange={(e) => setReportLabel(e.target.value)}
+                  className="invest-input"
+                />
+              </div>
+
+              <div>
+                <label className="invest-label">Arquivo *</label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  required
+                  onChange={(e) => {
+                    const selected = e.target.files?.[0] || null;
+                    setFile(selected);
+                    if (selected) handleFilePreview(selected);
+                  }}
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="mb-1 block text-sm font-medium text-[#CBD5E1]">
-                Rótulo opcional
-              </label>
-              <input
-                type="text"
-                placeholder="Ex: Jan a Mar/2026"
-                value={reportLabel}
-                onChange={(e) => setReportLabel(e.target.value)}
-                className="invest-input w-full px-3 py-2"
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-[#CBD5E1]">
-                Arquivo (CSV/Excel) *
-              </label>
-              <input
-                ref={fileInputRef}
-                type="file"
-                required
-                onChange={(e) => {
-                  const selected = e.target.files?.[0] || null;
-                  setFile(selected);
-                  if (selected) handleFilePreview(selected);
-                }}
-                className="invest-input w-full px-3 py-1.5 text-sm"
-              />
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--invest-border)] pt-5">
+              <p className="max-w-2xl text-sm leading-6 text-[var(--invest-muted)]">
+                A categoria orienta a leitura da Etapa 5, mas não altera o
+                arquivo original nem o `raw_json` preservado.
+              </p>
               <button
                 type="submit"
                 disabled={uploading}
-                className="mt-3 w-full rounded-md bg-[#4EA8DE] px-4 py-2 text-sm font-semibold text-[#0C111F] hover:opacity-90 disabled:opacity-50"
+                className="invest-button px-5 py-2"
               >
                 {uploading ? "Enviando..." : "Fazer upload"}
               </button>
@@ -357,84 +403,121 @@ export default function UploadsPage() {
           </form>
         </div>
 
-        <FaqBlock />
+        <div className="space-y-5">
+          <FaqBlock />
+          <section className="invest-card p-5">
+            <p className="invest-eyebrow">Categorias</p>
+            <h2 className="mt-2 text-lg font-black text-white">
+              Como decidir rápido
+            </h2>
+            <div className="mt-5 space-y-3">
+              {(Object.keys(categoryInfo) as UploadCategory[]).map((key) => (
+                <div
+                  key={key}
+                  className="rounded-lg border border-[var(--invest-border)] bg-[rgba(3,7,18,0.3)] p-3"
+                >
+                  <p className="text-sm font-black text-white">
+                    {categoryInfo[key].label}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-[var(--invest-muted)]">
+                    {categoryInfo[key].whenToUse}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
       </section>
 
-      <section className="overflow-hidden rounded-md border border-[#2D3748] bg-[#141B2D]">
-        <div className="border-b border-[#2D3748] p-4">
-          <h2 className="text-lg font-semibold text-white">Histórico de uploads</h2>
-          <p className="mt-1 text-sm text-[#CBD5E1]">
-            Ações preservadas: upload, processamento e análise continuam usando
-            os endpoints já validados.
-          </p>
+      <section className="invest-card overflow-hidden">
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--invest-border)] p-5">
+          <div>
+            <p className="invest-eyebrow">Histórico</p>
+            <h2 className="mt-2 text-xl font-black text-white">
+              Uploads importados
+            </h2>
+            <p className="mt-2 text-sm text-[var(--invest-muted)]">
+              Processamento e análise continuam chamando os endpoints já
+              validados.
+            </p>
+          </div>
+          <StatusPill tone="muted">{uploads.length} arquivos</StatusPill>
         </div>
 
         <div className="invest-soft-scroll overflow-x-auto">
-          <table className="w-full border-collapse text-left">
+          <table className="invest-table">
             <thead>
-              <tr className="border-b border-[#2D3748] bg-[#0C111F]">
-                <th className="p-4 text-sm font-medium text-[#CBD5E1]">Arquivo</th>
-                <th className="p-4 text-sm font-medium text-[#CBD5E1]">Contexto</th>
-                <th className="p-4 text-sm font-medium text-[#CBD5E1]">Status</th>
-                <th className="p-4 text-sm font-medium text-[#CBD5E1]">Ações</th>
+              <tr>
+                <th>Arquivo</th>
+                <th>Contexto</th>
+                <th>Status</th>
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={4} className="p-4 text-sm text-[#CBD5E1]">
-                    Carregando uploads...
-                  </td>
+                  <td colSpan={4}>Carregando uploads...</td>
+                </tr>
+              ) : uploads.length === 0 ? (
+                <tr>
+                  <td colSpan={4}>Nenhum upload registrado ainda.</td>
                 </tr>
               ) : (
                 uploads.map((up) => (
-                  <tr key={up.id} className="border-b border-[#2D3748]">
-                    <td
-                      className="max-w-[240px] truncate p-4 text-sm text-white"
-                      title={up.file_name}
-                    >
-                      {up.file_name}
+                  <tr key={up.id}>
+                    <td>
+                      <p className="max-w-[320px] truncate font-bold text-white" title={up.file_name}>
+                        {up.file_name}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--invest-faint)]">
+                        {up.cities?.name
+                          ? `${up.cities.name}/${up.cities.state}`
+                          : "Cidade não informada"}
+                      </p>
                     </td>
-                    <td className="p-4 text-sm">
-                      <span className="block font-medium text-white">
-                        {up.category} &rarr; {up.report_type}
+                    <td>
+                      <span className="block font-bold text-white">
+                        {categoryLabel(up.category)} → {up.report_type || "geral"}
                       </span>
-                      <span className="text-xs text-[#CBD5E1]">
+                      <span className="text-xs text-[var(--invest-muted)]">
                         {up.report_label || "Sem rótulo"}
                       </span>
                     </td>
-                    <td className="p-4 text-sm">
+                    <td>
                       <StatusPill tone={statusTone(up.analysis_status || up.status)}>
                         {up.analysis_status || up.status}
                       </StatusPill>
                     </td>
-                    <td className="flex items-center gap-2 p-4 text-sm">
-                      {up.status === "pending" && (
-                        <button
-                          onClick={() => handleProcess(up.id)}
-                          className="rounded-md border border-[#4EA8DE] px-3 py-1 text-[#4EA8DE] hover:bg-[#4EA8DE] hover:text-[#0C111F]"
-                        >
-                          Processar IA
-                        </button>
-                      )}
-
-                      {up.status === "processed" &&
-                        up.analysis_status !== "analyzed" && (
+                    <td>
+                      <div className="flex flex-wrap gap-2">
+                        {up.status === "pending" && (
                           <button
-                            onClick={() => handleAnalyze(up.id)}
-                            className="rounded-md border border-emerald-400 px-3 py-1 text-emerald-300 hover:bg-emerald-400 hover:text-[#0C111F]"
+                            onClick={() => handleProcess(up.id)}
+                            className="invest-button-secondary px-3 py-1 text-xs"
                           >
-                            Rodar análise IA
+                            Processar IA
                           </button>
                         )}
 
-                      {up.analysis_status === "analyzed" && (
-                        <StatusPill tone="success">Analisado</StatusPill>
-                      )}
+                        {up.status === "processed" &&
+                          up.analysis_status !== "analyzed" && (
+                            <button
+                              onClick={() => handleAnalyze(up.id)}
+                              className="invest-button px-3 py-1 text-xs"
+                            >
+                              Rodar análise IA
+                            </button>
+                          )}
 
-                      {up.analysis_status === "error" && (
-                        <StatusPill tone="danger">Erro na análise</StatusPill>
-                      )}
+                        {up.analysis_status === "analyzed" && (
+                          <StatusPill tone="success">Analisado</StatusPill>
+                        )}
+
+                        {up.analysis_status === "error" && (
+                          <StatusPill tone="danger">Erro na análise</StatusPill>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

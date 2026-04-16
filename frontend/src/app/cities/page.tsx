@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { StatusPill } from "@/components/app/status-pill";
 import { supabase } from "@/lib/supabase";
 
 interface City {
@@ -8,7 +9,7 @@ interface City {
   name: string;
   state: string;
   portal_url: string;
-  clients?: { name: string }; // Join com a tabela de clientes
+  clients?: { name: string };
 }
 
 interface Client {
@@ -21,7 +22,6 @@ export default function CitiesPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Estados do formulário
   const [name, setName] = useState("");
   const [state, setState] = useState("");
   const [portalUrl, setPortalUrl] = useState("");
@@ -33,15 +33,13 @@ export default function CitiesPage() {
 
   const fetchData = async () => {
     setLoading(true);
-    
-    // Buscar clientes para popular o Select (Dropdown)
+
     const { data: clientsData } = await supabase
       .from("clients")
       .select("id, name")
       .order("name");
     setClients(clientsData || []);
 
-    // Buscar cidades fazendo um "Join" simples com a tabela clients
     const { data: citiesData, error } = await supabase
       .from("cities")
       .select("*, clients(name)")
@@ -49,20 +47,20 @@ export default function CitiesPage() {
 
     if (error) console.error("Erro ao buscar cidades:", error);
     else setCities(citiesData || []);
-    
+
     setLoading(false);
   };
 
   const handleAddCity = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!clientId) {
       alert("Por favor, selecione um cliente para vincular a esta cidade.");
       return;
     }
 
     const { error } = await supabase.from("cities").insert([
-      { name, state, portal_url: portalUrl, client_id: clientId }
+      { name, state, portal_url: portalUrl, client_id: clientId },
     ]);
 
     if (error) {
@@ -71,7 +69,6 @@ export default function CitiesPage() {
       return;
     }
 
-    // Limpar form e recarregar
     setName("");
     setState("");
     setPortalUrl("");
@@ -80,116 +77,142 @@ export default function CitiesPage() {
   };
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-gray-800">Cidades Monitoradas</h1>
+    <div className="invest-page">
+      <section className="invest-page-hero p-6 md:p-8">
+        <p className="invest-eyebrow">Territórios monitorados</p>
+        <h1 className="invest-title mt-3 max-w-4xl text-3xl md:text-5xl">
+          Cidades e portais prontos para auditoria.
+        </h1>
+        <p className="invest-subtitle mt-4 max-w-3xl text-base">
+          Organize municípios, estado, portal de transparência e cliente
+          responsável sem alterar o backend analítico.
+        </p>
+      </section>
 
-      {/* Formulário de Cadastro */}
-      <div className="p-6 bg-white border rounded shadow-sm">
-        <h2 className="text-lg font-medium mb-4">Nova Cidade</h2>
-        <form onSubmit={handleAddCity} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-          <div className="col-span-1 md:col-span-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nome da Cidade</label>
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border rounded focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Ex: São Paulo"
-            />
-          </div>
-          <div className="col-span-1 md:col-span-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Estado (UF)</label>
-            <input
-              type="text"
-              required
-              maxLength={2}
-              value={state}
-              onChange={(e) => setState(e.target.value.toUpperCase())}
-              className="w-full px-3 py-2 border rounded focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Ex: SP"
-            />
-          </div>
-          <div className="col-span-1 md:col-span-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Portal da Transparência</label>
-            <input
-              type="url"
-              value={portalUrl}
-              onChange={(e) => setPortalUrl(e.target.value)}
-              className="w-full px-3 py-2 border rounded focus:ring-blue-500 focus:border-blue-500"
-              placeholder="https://..."
-            />
-          </div>
-          <div className="col-span-1 md:col-span-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Cliente Vinculado</label>
-            <select
-              required
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              className="w-full px-3 py-2 border rounded focus:ring-blue-500 focus:border-blue-500 bg-white"
-            >
-              <option value="" disabled>Selecione...</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="col-span-1 md:col-span-1">
-            <button
-              type="submit"
-              className="w-full px-4 py-2 text-white bg-blue-600 rounded hover:bg-blue-700"
-            >
-              Cadastrar
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[460px_minmax(0,1fr)]">
+        <form onSubmit={handleAddCity} className="invest-card p-5">
+          <p className="invest-eyebrow">Nova cidade</p>
+          <h2 className="mt-2 text-xl font-black text-white">
+            Base monitorada
+          </h2>
+          <div className="mt-6 space-y-4">
+            <div>
+              <label className="invest-label">Nome da cidade</label>
+              <input
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="invest-input"
+                placeholder="Ex: São Paulo"
+              />
+            </div>
+            <div>
+              <label className="invest-label">Estado UF</label>
+              <input
+                type="text"
+                required
+                maxLength={2}
+                value={state}
+                onChange={(e) => setState(e.target.value.toUpperCase())}
+                className="invest-input"
+                placeholder="Ex: SP"
+              />
+            </div>
+            <div>
+              <label className="invest-label">Portal da Transparência</label>
+              <input
+                type="url"
+                value={portalUrl}
+                onChange={(e) => setPortalUrl(e.target.value)}
+                className="invest-input"
+                placeholder="https://..."
+              />
+            </div>
+            <div>
+              <label className="invest-label">Cliente vinculado</label>
+              <select
+                required
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+                className="invest-select"
+              >
+                <option value="" disabled>
+                  Selecione...
+                </option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button type="submit" className="invest-button w-full px-4 py-2">
+              Cadastrar cidade
             </button>
           </div>
         </form>
-      </div>
 
-      {/* Listagem de Cidades */}
-      <div className="bg-white border rounded shadow-sm overflow-hidden">
-        <div className="p-4 border-b bg-gray-50">
-          <h2 className="text-lg font-medium">Cidades Cadastradas</h2>
-        </div>
-        <div className="p-0">
-          {loading ? (
-            <p className="p-6 text-gray-500">Carregando...</p>
-          ) : cities.length === 0 ? (
-            <p className="p-6 text-gray-500">Nenhuma cidade cadastrada ainda.</p>
-          ) : (
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50 border-b">
-                  <th className="p-4 font-medium text-sm text-gray-600">Cidade/UF</th>
-                  <th className="p-4 font-medium text-sm text-gray-600">Cliente Responsável</th>
-                  <th className="p-4 font-medium text-sm text-gray-600">Portal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cities.map((city) => (
-                  <tr key={city.id} className="border-b hover:bg-gray-50">
-                    <td className="p-4 text-sm text-gray-800 font-medium">
-                      {city.name} - {city.state}
-                    </td>
-                    <td className="p-4 text-sm text-gray-600">
-                      {/* Exibe o nome do cliente através do Join do Supabase */}
-                      {city.clients?.name || "Não vinculado"}
-                    </td>
-                    <td className="p-4 text-sm text-blue-600">
-                      {city.portal_url ? (
-                        <a href={city.portal_url} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                          Acessar Link
-                        </a>
-                      ) : (
-                        <span className="text-gray-400">Sem link</span>
-                      )}
-                    </td>
+        <section className="invest-card overflow-hidden">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--invest-border)] p-5">
+            <div>
+              <p className="invest-eyebrow">Mapa operacional</p>
+              <h2 className="mt-2 text-xl font-black text-white">
+                Cidades cadastradas
+              </h2>
+            </div>
+            <StatusPill tone="muted">{cities.length} bases</StatusPill>
+          </div>
+
+          <div className="invest-soft-scroll overflow-x-auto">
+            {loading ? (
+              <p className="p-6 text-sm text-[var(--invest-muted)]">
+                Carregando...
+              </p>
+            ) : cities.length === 0 ? (
+              <p className="p-6 text-sm text-[var(--invest-muted)]">
+                Nenhuma cidade cadastrada ainda.
+              </p>
+            ) : (
+              <table className="invest-table">
+                <thead>
+                  <tr>
+                    <th>Cidade/UF</th>
+                    <th>Cliente responsável</th>
+                    <th>Portal</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+                </thead>
+                <tbody>
+                  {cities.map((city) => (
+                    <tr key={city.id}>
+                      <td className="font-bold text-white">
+                        {city.name} - {city.state}
+                      </td>
+                      <td>{city.clients?.name || "Não vinculado"}</td>
+                      <td>
+                        {city.portal_url ? (
+                          <a
+                            href={city.portal_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-bold text-[var(--invest-cyan)] hover:underline"
+                          >
+                            Acessar portal
+                          </a>
+                        ) : (
+                          <span className="text-[var(--invest-faint)]">
+                            Sem link
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </section>
+      </section>
     </div>
   );
 }

@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { StatusPill } from "@/components/app/status-pill";
+import { SkeletonBlock } from "@/components/app/skeleton-block";
 import { supabase } from "@/lib/supabase";
 
 interface AlertRecord {
@@ -60,15 +62,13 @@ function categoryLabel(value: string | null | undefined) {
   return map[String(value || "")] || String(value || "Não informado");
 }
 
-function severityClass(severity?: string | null) {
+function severityTone(severity?: string | null) {
   const sev = String(severity || "").toLowerCase();
 
-  if (sev.includes("alta")) return "bg-red-50 text-red-700 border-red-200";
-  if (sev.includes("media") || sev.includes("média")) {
-    return "bg-yellow-50 text-yellow-700 border-yellow-200";
-  }
+  if (sev.includes("alta")) return "danger";
+  if (sev.includes("media") || sev.includes("média")) return "warning";
 
-  return "bg-blue-50 text-blue-700 border-blue-200";
+  return "info";
 }
 
 export default function AlertsPage() {
@@ -136,130 +136,175 @@ export default function AlertsPage() {
     });
   }, [alerts, severityFilter, categoryFilter, search]);
 
+  const highCount = alerts.filter((alert) =>
+    String(alert.severity || "").toLowerCase().includes("alta")
+  ).length;
+
   if (loading) {
     return (
-      <div className="p-6">
-        <p className="text-sm text-gray-600">Carregando alertas...</p>
+      <div className="invest-page">
+        <section className="invest-page-hero p-6">
+          <p className="invest-eyebrow">Evidências</p>
+          <h1 className="invest-title mt-3 text-3xl">Carregando alertas</h1>
+          <div className="mt-6 max-w-xl">
+            <SkeletonBlock lines={4} />
+          </div>
+        </section>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-bold text-gray-900">Alertas</h1>
-        <p className="text-sm text-gray-600">
-          Lista enxuta dos alertas gerados pela Etapa 5.
-        </p>
-      </header>
+    <div className="invest-page">
+      <section className="invest-page-hero p-6 md:p-8">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_440px]">
+          <div>
+            <p className="invest-eyebrow">Fila de evidências</p>
+            <h1 className="invest-title mt-3 max-w-4xl text-3xl md:text-5xl">
+              Alertas técnicos com leitura responsável.
+            </h1>
+            <p className="invest-subtitle mt-4 max-w-3xl text-base">
+              Filtre os pontos de atenção gerados pela Etapa 5 e avance para o
+              detalhe quando precisar de origem, contexto e dados brutos.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="invest-kpi">
+              <p className="text-xs font-bold text-[var(--invest-muted)]">
+                Total
+              </p>
+              <p className="invest-number mt-2 text-3xl font-black text-white">
+                {alerts.length}
+              </p>
+            </div>
+            <div className="invest-kpi">
+              <p className="text-xs font-bold text-[var(--invest-muted)]">
+                Filtrados
+              </p>
+              <p className="invest-number mt-2 text-3xl font-black text-white">
+                {filteredAlerts.length}
+              </p>
+            </div>
+            <div className="invest-kpi">
+              <p className="text-xs font-bold text-[var(--invest-muted)]">
+                Alta
+              </p>
+              <p className="invest-number mt-2 text-3xl font-black text-white">
+                {highCount}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {errorMessage && (
-        <div className="border border-red-200 bg-red-50 p-4 rounded text-sm text-red-700">
+        <div className="rounded-lg border border-[rgba(230,57,70,0.4)] bg-[rgba(230,57,70,0.1)] p-4 text-sm text-[#ffb4ba]">
           {errorMessage}
         </div>
       )}
 
-      <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar por título, explicação ou fornecedor"
-          className="border rounded px-3 py-2 text-sm md:col-span-2"
-        />
+      <section className="invest-card p-4">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px]">
+          <div>
+            <label className="invest-label">Busca textual</label>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por título, explicação ou fornecedor"
+              className="invest-input"
+            />
+          </div>
 
-        <select
-          value={severityFilter}
-          onChange={(e) => setSeverityFilter(e.target.value)}
-          className="border rounded px-3 py-2 text-sm"
-        >
-          <option value="">Todas as severidades</option>
-          <option value="alta">Alta</option>
-          <option value="media">Média</option>
-          <option value="baixa">Baixa</option>
-        </select>
+          <div>
+            <label className="invest-label">Severidade</label>
+            <select
+              value={severityFilter}
+              onChange={(e) => setSeverityFilter(e.target.value)}
+              className="invest-select"
+            >
+              <option value="">Todas as severidades</option>
+              <option value="alta">Alta</option>
+              <option value="media">Média</option>
+              <option value="baixa">Baixa</option>
+            </select>
+          </div>
 
-        <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="border rounded px-3 py-2 text-sm"
-        >
-          <option value="">Todas as categorias</option>
-          {categories.map((item) => (
-            <option key={item} value={item}>
-              {categoryLabel(item)}
-            </option>
-          ))}
-        </select>
+          <div>
+            <label className="invest-label">Categoria</label>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="invest-select"
+            >
+              <option value="">Todas as categorias</option>
+              {categories.map((item) => (
+                <option key={item} value={item}>
+                  {categoryLabel(item)}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
       </section>
 
-      <section className="text-sm text-gray-500">
-        Exibindo {filteredAlerts.length} de {alerts.length} alertas.
-      </section>
-
-      <section className="space-y-3">
+      <section className="grid grid-cols-1 gap-4">
         {filteredAlerts.map((alert) => (
           <article
             key={alert.id}
-            className="bg-white border rounded p-4 space-y-2"
+            className="group grid gap-5 rounded-lg border border-[var(--invest-border)] bg-[rgba(16,24,39,0.72)] p-5 shadow-[0_16px_42px_rgba(0,0,0,0.2)] transition duration-200 hover:border-[rgba(125,211,252,0.42)] hover:bg-[rgba(19,30,47,0.88)] xl:grid-cols-[180px_minmax(0,1fr)_220px]"
           >
-            <div className="flex flex-wrap items-center gap-2">
-              <span
-                className={`border rounded px-2 py-1 text-xs ${severityClass(
-                  alert.severity
-                )}`}
-              >
+            <div className="space-y-3">
+              <StatusPill tone={severityTone(alert.severity)}>
                 {alert.severity || "baixa"}
-              </span>
+              </StatusPill>
+              <div className="space-y-2 text-xs text-[var(--invest-muted)]">
+                <p>{categoryLabel(alert.category)}</p>
+                <p>{formatDate(alert.created_at)}</p>
+                {alert.cities?.name && (
+                  <p>
+                    {alert.cities.name}/{alert.cities.state}
+                  </p>
+                )}
+              </div>
+            </div>
 
-              <span className="text-xs text-gray-500">
-                {categoryLabel(alert.category)}
-              </span>
+            <div>
+              <h2 className="text-xl font-black leading-tight text-white">
+                {alert.title}
+              </h2>
 
-              <span className="text-xs text-gray-500">
-                {formatDate(alert.created_at)}
-              </span>
+              <p className="mt-3 max-w-4xl text-sm leading-7 text-[var(--invest-muted)]">
+                {alert.explanation || "Sem explicação registrada."}
+              </p>
 
-              {alert.cities?.name && (
-                <span className="text-xs text-gray-500">
-                  {alert.cities.name}/{alert.cities.state}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <span className="invest-chip">
+                  Fornecedor: {alert.supplier_name || "Não informado"}
                 </span>
-              )}
+                <span className="invest-chip">
+                  Relatório: {alert.report_type || alert.report_label || "Não informado"}
+                </span>
+              </div>
             </div>
 
-            <h2 className="font-semibold text-gray-900">{alert.title}</h2>
-
-            <p className="text-sm text-gray-700">
-              {alert.explanation || "Sem explicação registrada."}
-            </p>
-
-            <div className="text-sm text-gray-600 flex flex-wrap gap-4">
-              <span>
-                <strong>Fornecedor:</strong>{" "}
-                {alert.supplier_name || "Não informado"}
-              </span>
-
-              <span>
-                <strong>Valor:</strong> {formatMoney(parseAmount(alert.amount))}
-              </span>
-
-              <span>
-                <strong>Relatório:</strong>{" "}
-                {alert.report_type || alert.report_label || "Não informado"}
-              </span>
+            <div className="flex flex-col items-start justify-between gap-4 xl:items-end">
+              <p className="invest-number text-2xl font-black text-white">
+                {formatMoney(parseAmount(alert.amount))}
+              </p>
+              <Link
+                href={`/alerts/${alert.id}`}
+                className="invest-button-secondary px-4 py-2 text-sm"
+              >
+                Ver detalhe
+              </Link>
             </div>
-
-            <Link
-              href={`/alerts/${alert.id}`}
-              className="inline-flex border rounded px-3 py-2 text-sm text-blue-700 hover:bg-blue-50"
-            >
-              Ver detalhe
-            </Link>
           </article>
         ))}
 
         {filteredAlerts.length === 0 && (
-          <div className="bg-white border rounded p-6 text-sm text-gray-500">
+          <div className="invest-card p-8 text-center text-sm text-[var(--invest-muted)]">
             Nenhum alerta encontrado para os filtros atuais.
           </div>
         )}

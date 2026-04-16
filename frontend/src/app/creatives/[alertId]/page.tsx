@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import { StatusPill } from "@/components/app/status-pill";
 
 interface CreativeText {
   title: string;
@@ -59,10 +60,17 @@ function severityLabel(value: unknown) {
 function severityColor(value: unknown) {
   const sev = String(value || "").toLowerCase();
 
-  if (sev.includes("alta")) return "#dc2626";
-  if (sev.includes("media") || sev.includes("média")) return "#ca8a04";
+  if (sev.includes("alta")) return "#E63946";
+  if (sev.includes("media") || sev.includes("média")) return "#F5B84B";
 
-  return "#2563eb";
+  return "#4EA8DE";
+}
+
+function severityTone(value: unknown) {
+  const sev = String(value || "").toLowerCase();
+  if (sev.includes("alta")) return "danger";
+  if (sev.includes("media") || sev.includes("média")) return "warning";
+  return "info";
 }
 
 function parseAmount(value: unknown) {
@@ -145,149 +153,185 @@ function drawCreative(canvas: HTMLCanvasElement, data: CreativeResponse) {
   canvas.width = width;
   canvas.height = height;
 
-  ctx.fillStyle = "#f8fafc";
+  const gradient = ctx.createLinearGradient(0, 0, width, height);
+  gradient.addColorStop(0, "#070A0F");
+  gradient.addColorStop(0.48, "#101827");
+  gradient.addColorStop(1, "#06080D");
+
+  ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
 
-  ctx.fillStyle = "#111827";
-  ctx.fillRect(0, 0, width, 220);
+  ctx.strokeStyle = "rgba(125, 211, 252, 0.13)";
+  ctx.lineWidth = 1;
+  for (let x = 0; x < width; x += 54) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, height);
+    ctx.stroke();
+  }
+  for (let y = 0; y < height; y += 54) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = "rgba(16, 24, 39, 0.88)";
+  ctx.fillRect(margin, 70, width - margin * 2, height - 140);
+  ctx.strokeStyle = "rgba(148, 163, 184, 0.24)";
+  ctx.strokeRect(margin, 70, width - margin * 2, height - 140);
 
   ctx.fillStyle = accent;
-  ctx.fillRect(0, 220, width, 16);
+  ctx.fillRect(margin, 70, 12, height - 140);
 
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "700 34px Arial";
-  ctx.fillText("Fiscaliza.AI", margin, 92);
+  ctx.fillStyle = "#F8FAFC";
+  ctx.font = "800 34px Arial";
+  ctx.fillText("FISCALIZA.AI", margin + 44, 136);
 
+  ctx.fillStyle = "#A8B3C7";
   ctx.font = "400 24px Arial";
-  ctx.fillText("Transparência pública em linguagem simples", margin, 138);
+  ctx.fillText("Transparência pública em linguagem simples", margin + 44, 178);
+
+  ctx.fillStyle = "rgba(3, 7, 18, 0.62)";
+  ctx.fillRect(margin + 44, 230, 238, 58);
+  ctx.strokeStyle = accent;
+  ctx.strokeRect(margin + 44, 230, 238, 58);
 
   ctx.fillStyle = accent;
-  ctx.fillRect(margin, 270, 210, 54);
-
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "700 24px Arial";
+  ctx.font = "800 23px Arial";
   ctx.fillText(
     `Alerta ${severityLabel(data.source.alert?.severity)}`,
-    margin + 24,
-    305
+    margin + 66,
+    268
   );
 
-  ctx.fillStyle = "#111827";
-  ctx.font = "700 60px Arial";
+  ctx.fillStyle = "#F8FAFC";
+  ctx.font = "800 62px Arial";
   let currentY = drawWrappedText(
     ctx,
     data.creative.title,
-    margin,
-    410,
-    width - margin * 2,
-    68,
+    margin + 44,
+    395,
+    width - margin * 2 - 88,
+    70,
     3
   );
 
   currentY += 34;
 
-  ctx.fillStyle = "#374151";
+  ctx.fillStyle = "#CBD5E1";
   ctx.font = "400 34px Arial";
   currentY = drawWrappedText(
     ctx,
     data.creative.subtitle,
-    margin,
+    margin + 44,
     currentY,
-    width - margin * 2,
-    44,
+    width - margin * 2 - 88,
+    45,
     3
   );
 
-  currentY += 50;
+  currentY += 58;
 
-  ctx.fillStyle = "#111827";
-  ctx.font = "700 42px Arial";
-  ctx.fillText(formatMoney(data.source.alert?.amount), margin, currentY);
+  ctx.fillStyle = accent;
+  ctx.font = "800 46px Arial";
+  ctx.fillText(formatMoney(data.source.alert?.amount), margin + 44, currentY);
 
-  currentY += 54;
+  currentY += 58;
 
-  ctx.fillStyle = "#4b5563";
+  ctx.fillStyle = "#A8B3C7";
   ctx.font = "400 27px Arial";
-  ctx.fillText(
+  currentY = drawWrappedText(
+    ctx,
     `Fornecedor: ${normalizeLabel(data.source.alert?.supplier_name)}`,
-    margin,
-    currentY
+    margin + 44,
+    currentY,
+    width - margin * 2 - 88,
+    36,
+    2
   );
 
-  currentY += 64;
+  currentY += 68;
 
-  ctx.fillStyle = "#1f2937";
+  ctx.fillStyle = "#E2E8F0";
   ctx.font = "400 32px Arial";
   currentY = drawWrappedText(
     ctx,
     data.creative.body,
-    margin,
+    margin + 44,
     currentY,
-    width - margin * 2,
-    44,
+    width - margin * 2 - 88,
+    45,
     5
   );
 
   currentY += 58;
 
-  ctx.fillStyle = "#e5e7eb";
-  ctx.fillRect(margin, currentY, width - margin * 2, 2);
+  ctx.strokeStyle = "rgba(148, 163, 184, 0.28)";
+  ctx.beginPath();
+  ctx.moveTo(margin + 44, currentY);
+  ctx.lineTo(width - margin - 44, currentY);
+  ctx.stroke();
 
   currentY += 56;
 
-  ctx.fillStyle = "#111827";
-  ctx.font = "700 30px Arial";
-  ctx.fillText("Origem do dado", margin, currentY);
+  ctx.fillStyle = "#F8FAFC";
+  ctx.font = "800 29px Arial";
+  ctx.fillText("Origem do dado", margin + 44, currentY);
 
-  currentY += 44;
+  currentY += 46;
 
-  ctx.fillStyle = "#4b5563";
+  ctx.fillStyle = "#CBD5E1";
   ctx.font = "400 25px Arial";
   ctx.fillText(
     `Categoria: ${normalizeLabel(data.source.upload?.category_label)}`,
-    margin,
+    margin + 44,
     currentY
   );
 
-  currentY += 36;
+  currentY += 38;
 
   ctx.fillText(
     `Relatório: ${normalizeLabel(
       data.source.upload?.report_type || data.source.upload?.report_label
     )}`,
-    margin,
+    margin + 44,
     currentY
   );
 
-  currentY += 36;
+  currentY += 38;
 
-  ctx.fillText(
-    `Upload: ${normalizeLabel(data.source.upload?.file_name)}`,
-    margin,
-    currentY
-  );
-
-  ctx.fillStyle = "#111827";
-  ctx.fillRect(margin, height - 190, width - margin * 2, 86);
-
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "700 28px Arial";
   drawWrappedText(
     ctx,
-    data.creative.cta,
-    margin + 32,
-    height - 137,
-    width - margin * 2 - 64,
+    `Upload: ${normalizeLabel(data.source.upload?.file_name)}`,
+    margin + 44,
+    currentY,
+    width - margin * 2 - 88,
     34,
     2
   );
 
-  ctx.fillStyle = "#6b7280";
+  ctx.fillStyle = accent;
+  ctx.fillRect(margin + 44, height - 214, width - margin * 2 - 88, 88);
+
+  ctx.fillStyle = "#04111D";
+  ctx.font = "800 28px Arial";
+  drawWrappedText(
+    ctx,
+    data.creative.cta,
+    margin + 74,
+    height - 160,
+    width - margin * 2 - 148,
+    34,
+    2
+  );
+
+  ctx.fillStyle = "#A8B3C7";
   ctx.font = "400 22px Arial";
   ctx.fillText(
     `${data.creative.footer} • Alerta ${data.alert_id.slice(0, 8)}`,
-    margin,
-    height - 48
+    margin + 44,
+    height - 78
   );
 }
 
@@ -355,142 +399,180 @@ export default function CreativeByAlertPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <header className="space-y-3">
+    <div className="invest-page">
+      <section className="invest-page-hero p-6 md:p-8">
         <Link
           href={`/alerts/${alertId}`}
-          className="text-sm text-blue-700 hover:underline"
+          className="invest-button-secondary mb-5 w-fit px-4 py-2 text-sm"
         >
           Voltar para o alerta
         </Link>
 
-        <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Gerar arte do alerta
-          </h1>
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+          <div>
+            <p className="invest-eyebrow">Ateliê de comunicação</p>
+            <h1 className="invest-title mt-3 max-w-4xl text-3xl md:text-5xl">
+              Gere uma arte pública a partir de um alerta rastreável.
+            </h1>
+            <p className="invest-subtitle mt-4 max-w-3xl text-base">
+              A IA gera somente o texto. O template visual é local, exportável
+              em PNG e mantém a origem do alerta visível.
+            </p>
+          </div>
 
-          <p className="text-sm text-gray-600">
-            Crie uma peça visual simples a partir do alerta selecionado, usando
-            o contexto já validado nas etapas anteriores.
-          </p>
+          <div className="invest-card p-5">
+            <p className="invest-eyebrow">Fluxo</p>
+            <div className="mt-4 space-y-3 text-sm text-[var(--invest-muted)]">
+              <p>1. Gerar texto responsável no backend.</p>
+              <p>2. Aplicar no canvas local.</p>
+              <p>3. Baixar PNG sem salvar arte no banco.</p>
+            </div>
+          </div>
         </div>
-      </header>
+      </section>
 
-      <section className="border rounded bg-white p-4 space-y-4">
-        <div className="flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={generateCreative}
-            disabled={loading}
-            className="border rounded px-4 py-2 text-sm text-white bg-gray-900 disabled:opacity-50"
-          >
-            {loading ? "Gerando..." : "Gerar arte"}
-          </button>
+      <section className="invest-card p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="invest-eyebrow">Controle</p>
+            <h2 className="mt-2 text-xl font-black text-white">
+              Gerador visual
+            </h2>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={generateCreative}
+              disabled={loading}
+              className="invest-button px-5 py-2 text-sm"
+            >
+              {loading ? "Gerando..." : "Gerar arte"}
+            </button>
 
-          <button
-            type="button"
-            onClick={downloadPng}
-            disabled={!creativeData}
-            className="border rounded px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-          >
-            Baixar PNG
-          </button>
+            <button
+              type="button"
+              onClick={downloadPng}
+              disabled={!creativeData}
+              className="invest-button-secondary px-5 py-2 text-sm disabled:opacity-50"
+            >
+              Baixar PNG
+            </button>
+          </div>
         </div>
 
         {errorMessage && (
-          <div className="border border-red-200 bg-red-50 p-4 rounded text-sm text-red-700">
+          <div className="mt-5 rounded-lg border border-[rgba(230,57,70,0.4)] bg-[rgba(230,57,70,0.1)] p-4 text-sm text-[#ffb4ba]">
             {errorMessage}
           </div>
         )}
 
         {!creativeData && !errorMessage && (
-          <p className="text-sm text-gray-600">
-            Clique em <strong>Gerar arte</strong> para montar o texto com IA e
-            aplicar no template visual.
-          </p>
+          <div className="mt-5 rounded-lg border border-[var(--invest-border)] bg-[rgba(3,7,18,0.28)] p-5 text-sm leading-6 text-[var(--invest-muted)]">
+            Clique em <strong className="text-white">Gerar arte</strong> para
+            montar o texto com IA e aplicar no template executivo.
+          </div>
         )}
 
         {creativeData && (
-          <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
-            <div className="overflow-auto border rounded bg-gray-100 p-4">
-              <canvas
-                ref={canvasRef}
-                className="w-full max-w-[540px] mx-auto border bg-white"
-              />
+          <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+            <div className="rounded-lg border border-[var(--invest-border)] bg-[#030712] p-4">
+              <div className="invest-soft-scroll overflow-auto rounded-md bg-[rgba(255,255,255,0.03)] p-4">
+                <canvas
+                  ref={canvasRef}
+                  className="mx-auto w-full max-w-[560px] border border-[rgba(148,163,184,0.2)] bg-white"
+                />
+              </div>
             </div>
 
             <aside className="space-y-4 text-sm">
-              <div className="border rounded p-3">
-                <p className="text-xs text-gray-500 mb-1">Geração</p>
-                <p className="font-medium text-gray-900">
-                  {creativeData.ai_used
-                    ? "Texto gerado com IA"
-                    : "Texto gerado por fallback local"}
+              <div className="invest-card-solid p-4">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
+                  Geração
                 </p>
+                <div className="mt-3">
+                  <StatusPill tone={creativeData.ai_used ? "success" : "muted"}>
+                    {creativeData.ai_used
+                      ? "Texto gerado com IA"
+                      : "Fallback local"}
+                  </StatusPill>
+                </div>
               </div>
 
-              <div className="border rounded p-3 space-y-2">
-                <p className="text-xs text-gray-500">Textos da arte</p>
-
-                <p>
-                  <strong>Título:</strong> {creativeData.creative.title}
+              <div className="invest-card-solid p-4">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
+                  Textos da arte
                 </p>
-
-                <p>
-                  <strong>Subtítulo:</strong> {creativeData.creative.subtitle}
-                </p>
-
-                <p>
-                  <strong>Texto:</strong> {creativeData.creative.body}
-                </p>
-
-                <p>
-                  <strong>CTA:</strong> {creativeData.creative.cta}
-                </p>
+                <div className="mt-4 space-y-3 text-[var(--invest-muted)]">
+                  <p>
+                    <strong className="text-white">Título:</strong>{" "}
+                    {creativeData.creative.title}
+                  </p>
+                  <p>
+                    <strong className="text-white">Subtítulo:</strong>{" "}
+                    {creativeData.creative.subtitle}
+                  </p>
+                  <p>
+                    <strong className="text-white">Texto:</strong>{" "}
+                    {creativeData.creative.body}
+                  </p>
+                  <p>
+                    <strong className="text-white">CTA:</strong>{" "}
+                    {creativeData.creative.cta}
+                  </p>
+                </div>
               </div>
 
-              <div className="border rounded p-3 space-y-2">
-                <p className="text-xs text-gray-500">Rastreabilidade</p>
-
-                <p>
-                  <strong>Alerta:</strong> {creativeData.alert_id}
+              <div className="invest-card-solid p-4">
+                <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
+                  Rastreabilidade
                 </p>
-
-                <p>
-                  <strong>Upload:</strong>{" "}
-                  {creativeData.upload_id || "Não informado"}
-                </p>
-
-                <p>
-                  <strong>Registro origem:</strong>{" "}
-                  {creativeData.source_record_id || "Não vinculado"}
-                </p>
-
-                <p>
-                  <strong>Categoria:</strong>{" "}
-                  {normalizeLabel(creativeData.source.upload?.category_label)}
-                </p>
-
-                <p>
-                  <strong>Fornecedor:</strong>{" "}
-                  {normalizeLabel(creativeData.source.alert?.supplier_name)}
-                </p>
+                <div className="mt-4 space-y-3 text-[var(--invest-muted)]">
+                  <p>
+                    <strong className="text-white">Alerta:</strong>{" "}
+                    {creativeData.alert_id}
+                  </p>
+                  <p>
+                    <strong className="text-white">Upload:</strong>{" "}
+                    {creativeData.upload_id || "Não informado"}
+                  </p>
+                  <p>
+                    <strong className="text-white">Registro origem:</strong>{" "}
+                    {creativeData.source_record_id || "Não vinculado"}
+                  </p>
+                  <p>
+                    <strong className="text-white">Categoria:</strong>{" "}
+                    {normalizeLabel(creativeData.source.upload?.category_label)}
+                  </p>
+                  <p>
+                    <strong className="text-white">Fornecedor:</strong>{" "}
+                    {normalizeLabel(creativeData.source.alert?.supplier_name)}
+                  </p>
+                  <p>
+                    <strong className="text-white">Severidade:</strong>{" "}
+                    <StatusPill tone={severityTone(creativeData.source.alert?.severity)}>
+                      {normalizeLabel(creativeData.source.alert?.severity)}
+                    </StatusPill>
+                  </p>
+                </div>
               </div>
 
               {creativeData.source.raw_fields &&
                 Object.keys(creativeData.source.raw_fields).length > 0 && (
-                  <div className="border rounded p-3 space-y-2">
-                    <p className="text-xs text-gray-500">
+                  <div className="invest-card-solid p-4">
+                    <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
                       Campos de origem usados
                     </p>
 
-                    {Object.entries(creativeData.source.raw_fields).map(
-                      ([key, value]) => (
-                        <p key={key}>
-                          <strong>{key}:</strong> {value}
-                        </p>
-                      )
-                    )}
+                    <div className="mt-4 space-y-3 text-[var(--invest-muted)]">
+                      {Object.entries(creativeData.source.raw_fields).map(
+                        ([key, value]) => (
+                          <p key={key}>
+                            <strong className="text-white">{key}:</strong>{" "}
+                            {value}
+                          </p>
+                        )
+                      )}
+                    </div>
                   </div>
                 )}
             </aside>

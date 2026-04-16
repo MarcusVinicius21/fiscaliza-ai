@@ -20,16 +20,35 @@ export function ProgressSteps({
           <div
             key={step.label}
             className={[
-              "rounded-md border p-3",
+              "relative overflow-hidden rounded-lg border p-4 transition duration-200",
               active
-                ? "border-[#4EA8DE] bg-[#141B2D]"
+                ? "border-[rgba(125,211,252,0.54)] bg-[rgba(78,168,222,0.13)] shadow-[0_16px_36px_rgba(78,168,222,0.1)]"
                 : done
-                  ? "border-emerald-500/60 bg-[#141B2D]"
-                  : "border-[#2D3748] bg-[#0C111F]",
+                  ? "border-[rgba(45,212,191,0.38)] bg-[rgba(45,212,191,0.08)]"
+                  : "border-[var(--invest-border)] bg-[rgba(16,24,39,0.58)]",
             ].join(" ")}
           >
-            <p className="text-sm font-semibold text-white">{step.label}</p>
-            <p className="mt-1 text-xs text-[#CBD5E1]">{step.description}</p>
+            <div className="mb-4 flex items-center justify-between">
+              <span
+                className={[
+                  "flex h-8 w-8 items-center justify-center rounded-md border text-xs font-black",
+                  active
+                    ? "border-[rgba(125,211,252,0.6)] bg-[rgba(125,211,252,0.18)] text-[var(--invest-cyan)]"
+                    : done
+                      ? "border-[rgba(45,212,191,0.5)] bg-[rgba(45,212,191,0.14)] text-[var(--invest-success)]"
+                      : "border-[var(--invest-border)] text-[var(--invest-muted)]",
+                ].join(" ")}
+              >
+                {String(index + 1).padStart(2, "0")}
+              </span>
+              <span className="text-[0.68rem] font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
+                {done ? "feito" : active ? "agora" : "próximo"}
+              </span>
+            </div>
+            <p className="text-sm font-black text-white">{step.label}</p>
+            <p className="mt-1 text-xs leading-5 text-[var(--invest-muted)]">
+              {step.description}
+            </p>
           </div>
         );
       })}

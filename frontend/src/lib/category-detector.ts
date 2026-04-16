@@ -7,34 +7,77 @@ export type UploadCategory =
 
 export const categoryInfo: Record<
   UploadCategory,
-  { label: string; description: string; examples: string[] }
+  {
+    label: string;
+    description: string;
+    whenToUse: string;
+    detects: string[];
+    examples: string[];
+  }
 > = {
   contracts: {
     label: "Contratos",
     description:
-      "Use para contratos, termos, fornecedores, vigência, objeto e modalidade.",
+      "Para bases de contratos, termos, fornecedores, vigência, objeto, fiscais e modalidade.",
+    whenToUse:
+      "Use quando cada linha descreve contrato, aditivo, termo, ata ou vínculo formal com fornecedor.",
+    detects: [
+      "concentração de valor contratado",
+      "repetições contratuais relevantes",
+      "contexto por modalidade e tipo de ato",
+    ],
     examples: ["numero_contrato", "objeto", "vigencia", "fornecedor"],
   },
   payroll: {
     label: "Pessoal / RH",
-    description: "Use para folha, salários, cargos, servidores e remuneração.",
+    description:
+      "Para folha, salários, cargos, servidores, matrículas, diárias e remuneração.",
+    whenToUse:
+      "Use quando a base descreve pessoas, vínculos funcionais, remuneração ou cargos.",
+    detects: [
+      "valores individuais atípicos",
+      "concentrações por servidor",
+      "padrões de remuneração",
+    ],
     examples: ["servidor", "cargo", "salario", "remuneracao"],
   },
   expenses: {
     label: "Despesas / Pagamentos",
-    description: "Use para pagamentos, empenhos, liquidações e despesas pagas.",
+    description:
+      "Para pagamentos, empenhos, liquidações, credores e despesas pagas.",
+    whenToUse:
+      "Use quando a base descreve fluxo financeiro executado ou valores pagos a credores.",
+    detects: [
+      "pagamentos repetidos",
+      "concentração por credor",
+      "maiores despesas individuais",
+    ],
     examples: ["empenho", "pagamento", "credor", "valor_pago"],
   },
   bids: {
     label: "Licitações",
     description:
-      "Use para pregões, dispensas, modalidades e processos licitatórios.",
+      "Para pregões, dispensas, modalidades, certames, lotes e processos licitatórios.",
+    whenToUse:
+      "Use quando o arquivo descreve etapa anterior à contratação ou disputa pública.",
+    detects: [
+      "modalidades concentradas",
+      "valores por certame",
+      "padrões básicos de competição",
+    ],
     examples: ["licitacao", "pregao", "modalidade", "processo"],
   },
   others: {
     label: "Outros",
     description:
-      "Use quando o arquivo não se encaixa claramente nas categorias principais.",
+      "Para bases auxiliares que ainda não se encaixam nas categorias principais.",
+    whenToUse:
+      "Use como opção provisória quando os campos não deixam clara a natureza do arquivo.",
+    detects: [
+      "resumos básicos",
+      "campos preservados para rastreabilidade",
+      "análise genérica inicial",
+    ],
     examples: ["arquivo diverso", "base auxiliar"],
   },
 };
@@ -56,10 +99,43 @@ export function suggestCategoryFromHeaders(headers: string[]): UploadCategory {
     }
   };
 
-  add("contracts", ["contrato", "vigencia", "objeto", "fornecedor", "fiscal"]);
-  add("payroll", ["servidor", "cargo", "salario", "remuneracao", "matricula"]);
-  add("expenses", ["empenho", "pagamento", "liquidacao", "credor", "despesa"]);
-  add("bids", ["licitacao", "pregao", "dispensa", "modalidade", "certame"]);
+  add("contracts", [
+    "contrato",
+    "vigencia",
+    "vigência",
+    "objeto",
+    "fornecedor",
+    "fiscal",
+    "ata",
+    "aditivo",
+  ]);
+  add("payroll", [
+    "servidor",
+    "cargo",
+    "salario",
+    "salário",
+    "remuneracao",
+    "remuneração",
+    "matricula",
+    "matrícula",
+  ]);
+  add("expenses", [
+    "empenho",
+    "pagamento",
+    "liquidacao",
+    "liquidação",
+    "credor",
+    "despesa",
+  ]);
+  add("bids", [
+    "licitacao",
+    "licitação",
+    "pregao",
+    "pregão",
+    "dispensa",
+    "modalidade",
+    "certame",
+  ]);
 
   const best = Object.entries(score).sort((a, b) => b[1] - a[1])[0];
 

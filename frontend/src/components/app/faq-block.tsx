@@ -23,18 +23,24 @@ const faqs = [
 
 export function FaqBlock() {
   return (
-    <section className="rounded-md border border-[#2D3748] bg-[#141B2D] p-4">
-      <h2 className="text-sm font-semibold text-white">Perguntas rápidas</h2>
-      <div className="mt-4 space-y-3">
+    <section className="invest-card p-5">
+      <p className="invest-eyebrow">Ajuda contextual</p>
+      <h2 className="mt-2 text-lg font-black text-white">Perguntas rápidas</h2>
+      <div className="mt-5 space-y-3">
         {faqs.map((faq) => (
           <details
             key={faq.question}
-            className="rounded-md border border-[#2D3748] p-3"
+            className="group rounded-lg border border-[var(--invest-border)] bg-[rgba(3,7,18,0.34)] p-4 transition open:border-[rgba(125,211,252,0.36)]"
           >
-            <summary className="cursor-pointer text-sm font-medium text-white">
+            <summary className="flex list-none items-center justify-between gap-3 text-sm font-bold text-white">
               {faq.question}
+              <span className="text-[var(--invest-cyan)] transition group-open:rotate-45">
+                +
+              </span>
             </summary>
-            <p className="mt-2 text-sm text-[#CBD5E1]">{faq.answer}</p>
+            <p className="mt-3 text-sm leading-6 text-[var(--invest-muted)]">
+              {faq.answer}
+            </p>
           </details>
         ))}
       </div>

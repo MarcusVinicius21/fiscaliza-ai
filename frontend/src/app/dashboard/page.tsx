@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { StatusPill } from "@/components/app/status-pill";
+import { SkeletonBlock } from "@/components/app/skeleton-block";
 import { supabase } from "@/lib/supabase";
 
 interface UploadRecord {
@@ -82,15 +84,11 @@ function categoryLabel(value: string | null | undefined) {
   return map[String(value || "")] || normalizeLabel(value);
 }
 
-function severityClass(severity?: string | null) {
+function severityTone(severity?: string | null) {
   const sev = String(severity || "").toLowerCase();
-
-  if (sev.includes("alta")) return "bg-red-50 text-red-700 border-red-200";
-  if (sev.includes("media") || sev.includes("média")) {
-    return "bg-yellow-50 text-yellow-700 border-yellow-200";
-  }
-
-  return "bg-blue-50 text-blue-700 border-blue-200";
+  if (sev.includes("alta")) return "danger";
+  if (sev.includes("media") || sev.includes("média")) return "warning";
+  return "info";
 }
 
 function formatMoney(value: number) {
@@ -107,6 +105,37 @@ function formatDate(value?: string | null) {
   if (Number.isNaN(date.getTime())) return "—";
 
   return date.toLocaleDateString("pt-BR");
+}
+
+function MetricCard({
+  label,
+  value,
+  note,
+  tone = "info",
+}: {
+  label: string;
+  value: string | number;
+  note?: string;
+  tone?: "info" | "danger" | "success" | "warning";
+}) {
+  const accent = {
+    info: "from-[rgba(78,168,222,0.18)]",
+    danger: "from-[rgba(230,57,70,0.18)]",
+    success: "from-[rgba(45,212,191,0.18)]",
+    warning: "from-[rgba(245,184,75,0.18)]",
+  };
+
+  return (
+    <div className={`invest-kpi bg-gradient-to-b ${accent[tone]} to-transparent`}>
+      <p className="text-xs font-extrabold uppercase tracking-[0.1em] text-[var(--invest-faint)]">
+        {label}
+      </p>
+      <p className="invest-number mt-3 text-3xl font-black text-white">
+        {value}
+      </p>
+      {note && <p className="mt-2 text-xs text-[var(--invest-muted)]">{note}</p>}
+    </div>
+  );
 }
 
 export default function DashboardPage() {
@@ -252,13 +281,6 @@ export default function DashboardPage() {
     ? (resumoContextual.por_tipo_ato as Record<string, unknown>[])
     : [];
 
-  const globalCards = {
-    totalCidades: cityCount,
-    uploadsProcessados: uploadsProcessados.length,
-    uploadsAnalisados: uploadsAnalisados.length,
-    totalAlertas: alerts.length,
-  };
-
   const resumoInterpretativo =
     typeof selectedAiOutput?.resumo_interpretativo === "string"
       ? selectedAiOutput.resumo_interpretativo
@@ -271,405 +293,361 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="p-6">
-        <p className="text-sm text-gray-600">Carregando dashboard...</p>
+      <div className="invest-page">
+        <section className="invest-page-hero p-6">
+          <p className="invest-eyebrow">Painel executivo</p>
+          <h1 className="invest-title mt-3 text-3xl">Carregando operação</h1>
+          <div className="mt-6 max-w-xl">
+            <SkeletonBlock lines={4} />
+          </div>
+        </section>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-600">
-          Painel enxuto consumindo os resultados já produzidos pela Etapa 5.
-        </p>
-      </header>
+    <div className="invest-page">
+      <section className="invest-page-hero p-6 md:p-8">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_460px]">
+          <div>
+            <p className="invest-eyebrow">Painel executivo</p>
+            <h1 className="invest-title mt-3 max-w-4xl text-3xl md:text-5xl">
+              Leitura executiva dos achados já produzidos.
+            </h1>
+            <p className="invest-subtitle mt-4 max-w-3xl text-base">
+              O dashboard consome a Etapa 5 sem refazer análise. A tela organiza
+              alertas, resumos e contexto técnico para investigação responsável.
+            </p>
+          </div>
+
+          <div className="invest-card p-5">
+            <p className="invest-eyebrow">Upload em foco</p>
+            <label className="invest-label mt-4">Base analisada</label>
+            <select
+              value={selectedUpload?.id || ""}
+              onChange={(e) => setSelectedUploadId(e.target.value)}
+              className="invest-select"
+            >
+              {uploadsAnalisados.length === 0 && (
+                <option value="">Nenhum upload analisado</option>
+              )}
+
+              {uploadsAnalisados.map((upload) => (
+                <option key={upload.id} value={upload.id}>
+                  {upload.file_name} — {categoryLabel(upload.category)} —{" "}
+                  {upload.report_type || "sem subtipo"}
+                </option>
+              ))}
+            </select>
+
+            {selectedUpload && (
+              <div className="mt-4 rounded-lg border border-[var(--invest-border)] bg-[rgba(3,7,18,0.32)] p-4 text-sm text-[var(--invest-muted)]">
+                <p className="font-bold text-white">{selectedUpload.file_name}</p>
+                <p className="mt-2">
+                  {categoryLabel(selectedUpload.category)} •{" "}
+                  {selectedUpload.report_type || "sem subtipo"} •{" "}
+                  {selectedUpload.cities?.name
+                    ? `${selectedUpload.cities.name}/${selectedUpload.cities.state}`
+                    : "cidade não informada"}{" "}
+                  • {formatDate(selectedUpload.created_at)}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
 
       {errorMessage && (
-        <div className="border border-red-200 bg-red-50 p-4 rounded text-sm text-red-700">
+        <div className="rounded-lg border border-[rgba(230,57,70,0.4)] bg-[rgba(230,57,70,0.1)] p-4 text-sm text-[#ffb4ba]">
           {errorMessage}
         </div>
       )}
 
-      <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="border rounded p-4 bg-white">
-          <p className="text-xs text-gray-500">Cidades monitoradas</p>
-          <p className="text-lg font-bold text-gray-900">
-            {globalCards.totalCidades}
-          </p>
-        </div>
-
-        <div className="border rounded p-4 bg-white">
-          <p className="text-xs text-gray-500">Uploads processados</p>
-          <p className="text-lg font-bold text-gray-900">
-            {globalCards.uploadsProcessados}
-          </p>
-        </div>
-
-        <div className="border rounded p-4 bg-white">
-          <p className="text-xs text-gray-500">Uploads analisados</p>
-          <p className="text-lg font-bold text-gray-900">
-            {globalCards.uploadsAnalisados}
-          </p>
-        </div>
-
-        <div className="border rounded p-4 bg-white">
-          <p className="text-xs text-gray-500">Alertas gerados</p>
-          <p className="text-lg font-bold text-gray-900">
-            {globalCards.totalAlertas}
-          </p>
-        </div>
-      </section>
-
-      <section className="bg-white border rounded p-4 space-y-3">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Upload analisado
-          </label>
-          <select
-            value={selectedUpload?.id || ""}
-            onChange={(e) => setSelectedUploadId(e.target.value)}
-            className="w-full md:w-[520px] border rounded px-3 py-2 text-sm"
-          >
-            {uploadsAnalisados.length === 0 && (
-              <option value="">Nenhum upload analisado</option>
-            )}
-
-            {uploadsAnalisados.map((upload) => (
-              <option key={upload.id} value={upload.id}>
-                {upload.file_name} — {categoryLabel(upload.category)} —{" "}
-                {upload.report_type || "sem subtipo"}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {selectedUpload && (
-          <div className="text-sm text-gray-600">
-            <span className="font-medium text-gray-800">
-              {selectedUpload.file_name}
-            </span>{" "}
-            • {categoryLabel(selectedUpload.category)} •{" "}
-            {selectedUpload.report_type || "sem subtipo"} •{" "}
-            {selectedUpload.cities?.name
-              ? `${selectedUpload.cities.name}/${selectedUpload.cities.state}`
-              : "cidade não informada"}{" "}
-            • {formatDate(selectedUpload.created_at)}
-          </div>
-        )}
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <MetricCard label="Cidades monitoradas" value={cityCount} />
+        <MetricCard label="Uploads processados" value={uploadsProcessados.length} tone="success" />
+        <MetricCard label="Uploads analisados" value={uploadsAnalisados.length} tone="info" />
+        <MetricCard label="Alertas gerados" value={alerts.length} tone="warning" />
       </section>
 
       {!selectedUpload ? (
-        <div className="border rounded p-4 bg-yellow-50 text-sm text-yellow-800">
+        <div className="invest-card-highlight p-5 text-sm text-[var(--invest-muted)]">
           Ainda não existe upload com <code>analysis_status = analyzed</code>.
           Primeiro rode a Etapa 5 em pelo menos um arquivo.
         </div>
       ) : (
         <>
-          <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="border rounded p-4 bg-white">
-              <p className="text-xs text-gray-500">Registros analisados</p>
-              <p className="text-lg font-bold text-gray-900">{totalRegistros}</p>
-            </div>
-
-            <div className="border rounded p-4 bg-white">
-              <p className="text-xs text-gray-500">Valor analisado</p>
-              <p className="text-lg font-bold text-gray-900">
-                {formatMoney(valorTotal)}
-              </p>
-            </div>
-
-            <div className="border rounded p-4 bg-white">
-              <p className="text-xs text-gray-500">Alertas do upload</p>
-              <p className="text-lg font-bold text-gray-900">
-                {selectedAlerts.length}
-              </p>
-            </div>
-
-            <div className="border rounded p-4 bg-white">
-              <p className="text-xs text-gray-500">
-                Repetições estruturais ignoradas
-              </p>
-              <p className="text-lg font-bold text-gray-900">
-                {repeticoesIgnoradas.length}
-              </p>
-            </div>
+          <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <MetricCard label="Registros analisados" value={totalRegistros} />
+            <MetricCard label="Valor analisado" value={formatMoney(valorTotal)} note="Base deduplicada quando aplicável" />
+            <MetricCard label="Alertas do upload" value={selectedAlerts.length} tone="warning" />
+            <MetricCard label="Repetições ignoradas" value={repeticoesIgnoradas.length} tone="success" />
           </section>
 
-          <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <div className="border rounded bg-white">
-              <div className="p-4 border-b">
-                <h2 className="font-semibold text-gray-900">
-                  Resumo interpretativo da IA
-                </h2>
-              </div>
-              <div className="p-4 space-y-4 text-sm">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">
+          <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+            <article className="invest-card p-6">
+              <p className="invest-eyebrow">Síntese da IA</p>
+              <h2 className="mt-2 text-2xl font-black text-white">
+                Resumo interpretativo e contextual
+              </h2>
+              <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="invest-evidence rounded-lg p-4">
+                  <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-cyan)]">
                     Resumo interpretativo
                   </p>
-                  <p className="text-gray-800">
-                    {resumoInterpretativo || "Nenhum resumo interpretativo disponível."}
+                  <p className="mt-3 text-sm leading-7 text-[#dbe6f3]">
+                    {resumoInterpretativo ||
+                      "Nenhum resumo interpretativo disponível."}
                   </p>
                 </div>
 
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">
+                <div className="rounded-lg border border-[var(--invest-border)] bg-[rgba(3,7,18,0.32)] p-4">
+                  <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
                     Resumo contextual da IA
                   </p>
-                  <p className="text-gray-800">
-                    {resumoContextualIa || "Nenhum resumo contextual disponível."}
+                  <p className="mt-3 text-sm leading-7 text-[#dbe6f3]">
+                    {resumoContextualIa ||
+                      "Nenhum resumo contextual disponível."}
                   </p>
                 </div>
               </div>
-            </div>
+            </article>
 
-            <div className="border rounded bg-white">
-              <div className="p-4 border-b">
-                <h2 className="font-semibold text-gray-900">
-                  Contexto técnico do upload
-                </h2>
-              </div>
-              <div className="p-4 space-y-4 text-sm">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">
+            <aside className="invest-card p-6">
+              <p className="invest-eyebrow">Contexto técnico</p>
+              <h2 className="mt-2 text-xl font-black text-white">
+                Leitura operacional
+              </h2>
+              <div className="mt-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-[var(--invest-border)] pb-3">
+                  <span className="text-sm text-[var(--invest-muted)]">
                     Tipo de contexto
-                  </p>
-                  <p className="text-gray-800">
+                  </span>
+                  <span className="font-bold text-white">
                     {normalizeLabel(resumoContextual?.tipo_contexto)}
-                  </p>
+                  </span>
                 </div>
-
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">
-                    Repetições analíticas relevantes
-                  </p>
-                  <p className="text-gray-800">{repeticaoAnalitica.length}</p>
+                <div className="flex items-center justify-between border-b border-[var(--invest-border)] pb-3">
+                  <span className="text-sm text-[var(--invest-muted)]">
+                    Repetições relevantes
+                  </span>
+                  <span className="invest-number font-black text-white">
+                    {Array.isArray(repeticaoAnalitica)
+                      ? repeticaoAnalitica.length
+                      : 0}
+                  </span>
                 </div>
-
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">
-                    Repetições estruturais ignoradas
-                  </p>
-                  <p className="text-gray-800">{repeticoesIgnoradas.length}</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-[var(--invest-muted)]">
+                    Estruturais ignoradas
+                  </span>
+                  <span className="invest-number font-black text-white">
+                    {repeticoesIgnoradas.length}
+                  </span>
                 </div>
               </div>
-            </div>
+            </aside>
           </section>
 
-          <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <div className="border rounded bg-white overflow-hidden">
-              <div className="p-4 border-b">
-                <h2 className="font-semibold text-gray-900">
+          <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <div className="invest-card overflow-hidden">
+              <div className="border-b border-[var(--invest-border)] p-5">
+                <p className="invest-eyebrow">Ranking</p>
+                <h2 className="mt-2 text-lg font-black text-white">
                   Top concentração por fornecedor
                 </h2>
               </div>
-
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="text-left p-3">Fornecedor</th>
-                    <th className="text-right p-3">Valor</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topConcentracao.map((item, index) => (
-                    <tr key={`${normalizeLabel(item["nome_credor_servidor"])}-${index}`} className="border-b">
-                      <td className="p-3">
-                        {normalizeLabel(item["nome_credor_servidor"])}
-                      </td>
-                      <td className="p-3 text-right">
-                        {formatMoney(
-                          parseAmount(item["valor_bruto"] ?? item["valor_total"])
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-
-                  {topConcentracao.length === 0 && (
+              <div className="invest-soft-scroll overflow-x-auto">
+                <table className="invest-table">
+                  <thead>
                     <tr>
-                      <td colSpan={2} className="p-4 text-gray-500">
-                        Nenhum ranking disponível.
-                      </td>
+                      <th>Fornecedor</th>
+                      <th className="text-right">Valor</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {topConcentracao.map((item, index) => (
+                      <tr key={`${normalizeLabel(item["nome_credor_servidor"])}-${index}`}>
+                        <td>{normalizeLabel(item["nome_credor_servidor"])}</td>
+                        <td className="text-right invest-number">
+                          {formatMoney(
+                            parseAmount(item["valor_bruto"] ?? item["valor_total"])
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+
+                    {topConcentracao.length === 0 && (
+                      <tr>
+                        <td colSpan={2}>Nenhum ranking disponível.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
-            <div className="border rounded bg-white overflow-hidden">
-              <div className="p-4 border-b">
-                <h2 className="font-semibold text-gray-900">
+            <div className="invest-card overflow-hidden">
+              <div className="border-b border-[var(--invest-border)] p-5">
+                <p className="invest-eyebrow">Maiores itens</p>
+                <h2 className="mt-2 text-lg font-black text-white">
                   Maiores registros do upload
                 </h2>
               </div>
-
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="text-left p-3">Nome</th>
-                    <th className="text-left p-3">Documento</th>
-                    <th className="text-right p-3">Valor</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {maioresRegistros.map((item, index) => (
-                    <tr key={`${normalizeLabel(item["nome_credor_servidor"])}-${index}`} className="border-b">
-                      <td className="p-3">
-                        {normalizeLabel(item["nome_credor_servidor"])}
-                      </td>
-                      <td className="p-3">
-                        {normalizeLabel(item["documento"])}
-                      </td>
-                      <td className="p-3 text-right">
-                        {formatMoney(parseAmount(item["valor_bruto"]))}
-                      </td>
-                    </tr>
-                  ))}
-
-                  {maioresRegistros.length === 0 && (
+              <div className="invest-soft-scroll overflow-x-auto">
+                <table className="invest-table">
+                  <thead>
                     <tr>
-                      <td colSpan={3} className="p-4 text-gray-500">
-                        Nenhum registro disponível.
-                      </td>
+                      <th>Nome</th>
+                      <th>Documento</th>
+                      <th className="text-right">Valor</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {maioresRegistros.map((item, index) => (
+                      <tr key={`${normalizeLabel(item["nome_credor_servidor"])}-${index}`}>
+                        <td>{normalizeLabel(item["nome_credor_servidor"])}</td>
+                        <td>{normalizeLabel(item["documento"])}</td>
+                        <td className="text-right invest-number">
+                          {formatMoney(parseAmount(item["valor_bruto"]))}
+                        </td>
+                      </tr>
+                    ))}
+
+                    {maioresRegistros.length === 0 && (
+                      <tr>
+                        <td colSpan={3}>Nenhum registro disponível.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </section>
 
-          <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <div className="border rounded bg-white overflow-hidden">
-              <div className="p-4 border-b">
-                <h2 className="font-semibold text-gray-900">
+          <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <div className="invest-card overflow-hidden">
+              <div className="border-b border-[var(--invest-border)] p-5">
+                <p className="invest-eyebrow">Contratos</p>
+                <h2 className="mt-2 text-lg font-black text-white">
                   Resumo por modalidade
                 </h2>
               </div>
-
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="text-left p-3">Modalidade</th>
-                    <th className="text-right p-3">Valor</th>
-                    <th className="text-right p-3">Qtd.</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {porModalidade.map((item, index) => (
-                    <tr key={`${normalizeLabel(item["modalidade"])}-${index}`} className="border-b">
-                      <td className="p-3">{normalizeLabel(item["modalidade"])}</td>
-                      <td className="p-3 text-right">
-                        {formatMoney(parseAmount(item["valor_total"]))}
-                      </td>
-                      <td className="p-3 text-right">
-                        {Number(item["qtd_registros"] || 0)}
-                      </td>
-                    </tr>
-                  ))}
-
-                  {porModalidade.length === 0 && (
+              <div className="invest-soft-scroll overflow-x-auto">
+                <table className="invest-table">
+                  <thead>
                     <tr>
-                      <td colSpan={3} className="p-4 text-gray-500">
-                        Nenhuma modalidade disponível.
-                      </td>
+                      <th>Modalidade</th>
+                      <th className="text-right">Valor</th>
+                      <th className="text-right">Qtd.</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {porModalidade.map((item, index) => (
+                      <tr key={`${normalizeLabel(item["modalidade"])}-${index}`}>
+                        <td>{normalizeLabel(item["modalidade"])}</td>
+                        <td className="text-right invest-number">
+                          {formatMoney(parseAmount(item["valor_total"]))}
+                        </td>
+                        <td className="text-right invest-number">
+                          {Number(item["qtd_registros"] || 0)}
+                        </td>
+                      </tr>
+                    ))}
+
+                    {porModalidade.length === 0 && (
+                      <tr>
+                        <td colSpan={3}>Nenhuma modalidade disponível.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
-            <div className="border rounded bg-white overflow-hidden">
-              <div className="p-4 border-b">
-                <h2 className="font-semibold text-gray-900">
+            <div className="invest-card overflow-hidden">
+              <div className="border-b border-[var(--invest-border)] p-5">
+                <p className="invest-eyebrow">Atos</p>
+                <h2 className="mt-2 text-lg font-black text-white">
                   Resumo por tipo de ato
                 </h2>
               </div>
-
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="text-left p-3">Tipo de ato</th>
-                    <th className="text-right p-3">Valor</th>
-                    <th className="text-right p-3">Qtd.</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {porTipoAto.map((item, index) => (
-                    <tr key={`${normalizeLabel(item["tipo_ato"])}-${index}`} className="border-b">
-                      <td className="p-3">{normalizeLabel(item["tipo_ato"])}</td>
-                      <td className="p-3 text-right">
-                        {formatMoney(parseAmount(item["valor_total"]))}
-                      </td>
-                      <td className="p-3 text-right">
-                        {Number(item["qtd_registros"] || 0)}
-                      </td>
-                    </tr>
-                  ))}
-
-                  {porTipoAto.length === 0 && (
+              <div className="invest-soft-scroll overflow-x-auto">
+                <table className="invest-table">
+                  <thead>
                     <tr>
-                      <td colSpan={3} className="p-4 text-gray-500">
-                        Nenhum tipo de ato disponível.
-                      </td>
+                      <th>Tipo de ato</th>
+                      <th className="text-right">Valor</th>
+                      <th className="text-right">Qtd.</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {porTipoAto.map((item, index) => (
+                      <tr key={`${normalizeLabel(item["tipo_ato"])}-${index}`}>
+                        <td>{normalizeLabel(item["tipo_ato"])}</td>
+                        <td className="text-right invest-number">
+                          {formatMoney(parseAmount(item["valor_total"]))}
+                        </td>
+                        <td className="text-right invest-number">
+                          {Number(item["qtd_registros"] || 0)}
+                        </td>
+                      </tr>
+                    ))}
+
+                    {porTipoAto.length === 0 && (
+                      <tr>
+                        <td colSpan={3}>Nenhum tipo de ato disponível.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </section>
 
-          <section className="border rounded bg-white overflow-hidden">
-            <div className="p-4 border-b">
-              <h2 className="font-semibold text-gray-900">
+          <section className="invest-card overflow-hidden">
+            <div className="border-b border-[var(--invest-border)] p-5">
+              <p className="invest-eyebrow">Fila do upload</p>
+              <h2 className="mt-2 text-lg font-black text-white">
                 Alertas do upload selecionado
               </h2>
             </div>
 
-            <div className="divide-y">
+            <div className="divide-y divide-[rgba(148,163,184,0.13)]">
               {selectedAlerts.map((alert) => (
-                <article key={alert.id} className="p-4 space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`border rounded px-2 py-1 text-xs ${severityClass(
-                        alert.severity
-                      )}`}
-                    >
+                <article key={alert.id} className="grid gap-4 p-5 lg:grid-cols-[200px_minmax(0,1fr)_160px]">
+                  <div className="flex flex-wrap items-start gap-2">
+                    <StatusPill tone={severityTone(alert.severity)}>
                       {alert.severity || "baixa"}
-                    </span>
+                    </StatusPill>
+                    <span className="invest-chip">{categoryLabel(alert.category)}</span>
+                  </div>
 
-                    <span className="text-xs text-gray-500">
-                      {categoryLabel(alert.category)}
-                    </span>
-
-                    <span className="text-xs text-gray-500">
-                      {formatDate(alert.created_at)}
-                    </span>
-
-                    {alert.amount !== null && alert.amount !== undefined && (
-                      <span className="text-xs text-gray-500">
-                        {formatMoney(parseAmount(alert.amount))}
-                      </span>
+                  <div>
+                    <h3 className="text-base font-black text-white">{alert.title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-[var(--invest-muted)]">
+                      {alert.explanation || "Sem explicação registrada."}
+                    </p>
+                    {alert.supplier_name && (
+                      <p className="mt-2 text-xs text-[var(--invest-faint)]">
+                        Fornecedor: {alert.supplier_name}
+                      </p>
                     )}
                   </div>
 
-                  <h3 className="font-medium text-gray-900">{alert.title}</h3>
-
-                  <p className="text-sm text-gray-700">
-                    {alert.explanation || "Sem explicação registrada."}
-                  </p>
-
-                  {alert.supplier_name && (
-                    <p className="text-xs text-gray-500">
-                      Fornecedor: {alert.supplier_name}
-                    </p>
-                  )}
+                  <div className="text-left text-sm text-[var(--invest-muted)] lg:text-right">
+                    <p>{formatDate(alert.created_at)}</p>
+                    {alert.amount !== null && alert.amount !== undefined && (
+                      <p className="invest-number mt-2 font-black text-white">
+                        {formatMoney(parseAmount(alert.amount))}
+                      </p>
+                    )}
+                  </div>
                 </article>
               ))}
 
               {selectedAlerts.length === 0 && (
-                <p className="p-4 text-sm text-gray-500">
+                <p className="p-5 text-sm text-[var(--invest-muted)]">
                   Nenhum alerta encontrado para este upload.
                 </p>
               )}
