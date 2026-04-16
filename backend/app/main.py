@@ -3,6 +3,8 @@ import io
 import json
 import re
 import time
+import urllib.error
+import urllib.request
 
 import google.generativeai as genai
 import pandas as pd
@@ -29,6 +31,175 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
+
+
+def normalize_provider_error(error):
+    if isinstance(error, urllib.error.HTTPError):
+        if error.code == 429:
+            return "quota_or_rate_limit"
+        if 500 <= error.code <= 599:
+            return "provider_unavailable"
+        if error.code in {401, 403}:
+            return "auth_error"
+        return f"http_{error.code}"
+
+    text = str(error or "").lower()
+    if "429" in text or "quota" in text:
+        return "quota_exceeded"
+    if "rate" in text and "limit" in text:
+        return "rate_limited"
+    if "timeout" in text or "timed out" in text:
+        return "timeout"
+    if "connection" in text or "network" in text or "temporary failure" in text:
+        return "network_error"
+    if "json" in text or "parse" in text:
+        return "invalid_json"
+    if "empty" in text:
+        return "empty_response"
+    if "unavailable" in text or "overloaded" in text or "5" in text:
+        return "provider_unavailable"
+    return "provider_error"
+
+
+def build_provider_chain():
+    providers = ["gemini", "groq", "openrouter"]
+    preferred = os.getenv("AI_PROVIDER", "gemini").strip().lower()
+
+    if preferred in providers:
+        return [preferred] + [provider for provider in providers if provider != preferred]
+
+    return providers
+
+
+def provider_config(provider):
+    if provider == "gemini":
+        return GEMINI_API_KEY, GEMINI_MODEL
+    if provider == "groq":
+        return GROQ_API_KEY, GROQ_MODEL
+    if provider == "openrouter":
+        return OPENROUTER_API_KEY, OPENROUTER_MODEL
+    return None, None
+
+
+def call_gemini_text(prompt, model_name):
+    model = genai.GenerativeModel(model_name)
+    response = model.generate_content(prompt)
+    text = getattr(response, "text", "").strip()
+    if not text:
+        raise ValueError("empty_response")
+    return text
+
+
+def call_openai_compatible_text(provider, prompt, api_key, model_name):
+    url = (
+        "https://api.groq.com/openai/v1/chat/completions"
+        if provider == "groq"
+        else "https://openrouter.ai/api/v1/chat/completions"
+    )
+
+    payload = {
+        "model": model_name,
+        "messages": [
+            {
+                "role": "system",
+                "content": "Responda apenas com JSON válido, sem markdown e sem texto extra.",
+            },
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.2,
+    }
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    if provider == "openrouter":
+        headers["HTTP-Referer"] = "http://localhost:3000"
+        headers["X-Title"] = "Fiscaliza.AI"
+
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+
+    with urllib.request.urlopen(request, timeout=60) as response:
+        body = response.read().decode("utf-8")
+
+    parsed = json.loads(body)
+    choices = parsed.get("choices") if isinstance(parsed, dict) else None
+    if not choices:
+        raise ValueError("empty_response")
+
+    message = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
+    text = str(message.get("content") or "").strip()
+    if not text:
+        raise ValueError("empty_response")
+    return text
+
+
+def call_provider_text(provider, prompt, api_key, model_name):
+    if provider == "gemini":
+        return call_gemini_text(prompt, model_name)
+    if provider in {"groq", "openrouter"}:
+        return call_openai_compatible_text(provider, prompt, api_key, model_name)
+    raise ValueError("provider_not_supported")
+
+
+def run_ai_with_fallback(prompt, parse_json_func):
+    attempted_providers = []
+    failed_attempts = []
+
+    for provider in build_provider_chain():
+        api_key, model_name = provider_config(provider)
+
+        if not api_key or not model_name:
+            failed_attempts.append({
+                "provider": provider,
+                "reason": "not_configured",
+            })
+            continue
+
+        attempted_providers.append(provider)
+
+        try:
+            raw_text = call_provider_text(provider, prompt, api_key, model_name)
+            parsed = parse_json_func(raw_text)
+            meta = {
+                "provider_used": provider,
+                "model_used": model_name,
+                "fallback_used": bool(failed_attempts),
+                "attempted_providers": attempted_providers,
+                "failed_attempts": failed_attempts,
+            }
+            return {
+                "success": True,
+                "data": parsed,
+                "provider_meta": meta,
+            }
+        except Exception as e:
+            failed_attempts.append({
+                "provider": provider,
+                "reason": normalize_provider_error(e),
+            })
+
+    return {
+        "success": False,
+        "data": None,
+        "provider_meta": {
+            "provider_used": None,
+            "model_used": None,
+            "fallback_used": bool(failed_attempts),
+            "attempted_providers": attempted_providers,
+            "failed_attempts": failed_attempts,
+        },
+    }
 
 # ==========================================================
 # 1. SMART PARSER ROBUSTO
@@ -661,6 +832,9 @@ async def analyze_upload(upload_id: str):
     def safe_parse_ai_json(ai_text: str):
         text = (ai_text or "").strip()
 
+        def clean(value, limit=240):
+            return str(value or "").strip()[:limit]
+
         if text.startswith("```"):
             text = re.sub(r"^```(?:json)?\s*", "", text)
             text = re.sub(r"\s*```$", "", text)
@@ -724,6 +898,89 @@ async def analyze_upload(upload_id: str):
             "frase_impacto": str(creative_copy.get("frase_impacto", "") or "")[:180],
             "cta": str(creative_copy.get("cta", "") or "")[:100],
             "rodape": str(creative_copy.get("rodape", "") or "")[:120],
+        }
+
+        principal_source = parsed.get("insight_principal")
+        if not isinstance(principal_source, dict):
+            principal_source = insights[0] if insights else {}
+
+        parsed["insight_principal"] = {
+            "categoria_editorial": clean(
+                principal_source.get("categoria_editorial") or principal_source.get("tipo"),
+                80,
+            ),
+            "titulo": clean(
+                principal_source.get("titulo") or principal_source.get("headline"),
+                140,
+            ),
+            "headline": clean(principal_source.get("headline"), 180),
+            "subheadline": clean(principal_source.get("subheadline"), 220),
+            "traducao_pratica": clean(principal_source.get("traducao_pratica"), 220),
+            "por_que_preocupa": clean(principal_source.get("por_que_preocupa"), 260),
+            "envolvido_principal": clean(
+                principal_source.get("envolvido_principal")
+                or principal_source.get("supplier_name"),
+                160,
+            ),
+            "gravidade_editorial": clean(principal_source.get("gravidade_editorial"), 40),
+        }
+
+        if not parsed["insights_executivos"] and parsed["insight_principal"]["headline"]:
+            parsed["insights_executivos"] = [{
+                "tipo": parsed["insight_principal"]["categoria_editorial"],
+                "headline": parsed["insight_principal"]["headline"],
+                "subheadline": parsed["insight_principal"]["subheadline"],
+                "traducao_pratica": parsed["insight_principal"]["traducao_pratica"],
+                "por_que_preocupa": parsed["insight_principal"]["por_que_preocupa"],
+                "termo_explicado": "",
+                "gravidade_editorial": parsed["insight_principal"]["gravidade_editorial"],
+            }]
+
+        explicacoes_source = parsed.get("explicacoes_contextuais")
+        if not isinstance(explicacoes_source, list):
+            explicacoes_source = parsed.get("glossario_contextual", [])
+
+        explicacoes = []
+        for item in explicacoes_source:
+            if not isinstance(item, dict):
+                continue
+            explicacoes.append({
+                "termo": clean(item.get("termo"), 80),
+                "explicacao_curta": clean(item.get("explicacao_curta"), 220),
+            })
+        parsed["explicacoes_contextuais"] = explicacoes
+        parsed["glossario_contextual"] = explicacoes
+
+        blocos_source = parsed.get("blocos_executivos")
+        if not isinstance(blocos_source, dict):
+            blocos_source = {}
+
+        insight = parsed["insight_principal"]
+        parsed["blocos_executivos"] = {
+            "o_que_aconteceu": clean(
+                blocos_source.get("o_que_aconteceu") or insight.get("headline"),
+                220,
+            ),
+            "quanto_custa": clean(blocos_source.get("quanto_custa"), 160),
+            "peso_no_arquivo": clean(
+                blocos_source.get("peso_no_arquivo") or insight.get("subheadline"),
+                180,
+            ),
+            "traducao_do_valor": clean(
+                blocos_source.get("traducao_do_valor")
+                or insight.get("traducao_pratica"),
+                200,
+            ),
+            "por_que_preocupa": clean(
+                blocos_source.get("por_que_preocupa")
+                or insight.get("por_que_preocupa"),
+                240,
+            ),
+            "proxima_pergunta": clean(
+                blocos_source.get("proxima_pergunta")
+                or "Quais documentos justificam esse valor, esse volume ou essa concentração?",
+                180,
+            ),
         }
 
         parsed.pop("resumo_contextual", None)
@@ -1091,6 +1348,25 @@ async def analyze_upload(upload_id: str):
             "resumo_interpretativo": "IA desativada ou não executada.",
             "resumo_contextual_ia": "Resumo contextual indisponível ou IA não executada.",
             "alertas": [],
+            "insight_principal": {
+                "categoria_editorial": "",
+                "titulo": "Ponto de atenção no arquivo",
+                "headline": "",
+                "subheadline": "",
+                "traducao_pratica": "",
+                "por_que_preocupa": "",
+                "envolvido_principal": "",
+                "gravidade_editorial": "",
+            },
+            "explicacoes_contextuais": [],
+            "blocos_executivos": {
+                "o_que_aconteceu": "",
+                "quanto_custa": "",
+                "peso_no_arquivo": "",
+                "traducao_do_valor": "",
+                "por_que_preocupa": "",
+                "proxima_pergunta": "Quais documentos justificam esse valor, esse volume ou essa concentração?",
+            },
             "insights_executivos": [],
             "glossario_contextual": [],
             "creative_copy": {
@@ -1100,9 +1376,16 @@ async def analyze_upload(upload_id: str):
                 "cta": "Veja os dados. Peça explicações.",
                 "rodape": "Fonte: Fiscaliza.AI · dados públicos analisados",
             },
+            "provider_meta": {
+                "provider_used": None,
+                "model_used": None,
+                "fallback_used": False,
+                "attempted_providers": [],
+                "failed_attempts": [],
+            },
         }
 
-        if os.getenv("AI_PROVIDER", "none").lower() == "gemini" and os.getenv("GEMINI_API_KEY"):
+        if any([GEMINI_API_KEY, GROQ_API_KEY, OPENROUTER_API_KEY]):
             prompt = f"""
 Você é o redator analítico do Fiscaliza.AI.
 
@@ -1123,7 +1406,7 @@ Sua tarefa:
 3. Traduzir números quando houver base: peso no total, custo mensal, frequência de modalidade e concentração por fornecedor.
 4. Explicar termos difíceis somente quando ajudarem o cidadão, em uma frase curta.
 5. Gerar alertas apenas se os números justificarem.
-6. Gerar insights_executivos para orientar dashboard, lista de alertas, detalhe e arte.
+6. Gerar insight_principal e blocos_executivos para orientar dashboard, lista de alertas, detalhe e arte.
 
 Regras editoriais obrigatórias:
 - Vá direto ao ponto.
@@ -1140,14 +1423,24 @@ Regras editoriais obrigatórias:
 - Para contracts, diferencie repetição estrutural do arquivo de repetição contratual analiticamente relevante.
 - Se houver inexigibilidade, explique que é contratação sem competição formal, permitida apenas em situações específicas.
 
-Como construir insights_executivos:
-- Cada insight deve responder: o que aconteceu, quanto custa, por que importa, o que torna incomum e quem está envolvido.
+Como construir insight_principal:
+- Deve responder: o que aconteceu, quanto custa, em que foi gasto, por quanto tempo se houver vigência, quem concentrou o gasto e por que preocupa.
+- O campo titulo deve nomear o problema, exemplo: "Concentração de valor em um só fornecedor".
+- O campo headline deve expor o fato principal com valor, fornecedor ou modalidade.
 - Se houver vigência suficiente, calcule custo mensal estimado.
 - Se houver valor total do upload, calcule peso aproximado no total.
 - Se houver modalidade e total de registros, calcule frequência aproximada.
 - Se faltarem dados, omita a frase derivada. Nunca invente.
-- O campo headline deve ser forte e específico.
 - O campo por_que_preocupa deve explicar por que isso merece apuração, sem afirmar crime.
+- Não diga "município pequeno" se o porte municipal não estiver no contexto. Nesse caso, diga que exige explicação pela dimensão do gasto e pela concentração.
+
+Como construir blocos_executivos:
+- o_que_aconteceu: uma frase factual.
+- quanto_custa: valor principal, se houver.
+- peso_no_arquivo: percentual ou peso relativo, se houver.
+- traducao_do_valor: custo mensal ou comparação simples derivada dos próprios dados, se houver.
+- por_que_preocupa: motivo claro para leigo.
+- proxima_pergunta: pergunta que o cidadão, jornalista ou gabinete deve fazer.
 
 Como construir creative_copy:
 - Deve parecer post de rede social, não relatório.
@@ -1170,23 +1463,30 @@ RESPONDA APENAS EM JSON VÁLIDO NESTA ESTRUTURA:
       "supplier_name": "Fornecedor"
     }}
   ],
-  "insights_executivos": [
-    {{
-      "tipo": "concentracao_fornecedor",
-      "headline": "Fornecedor concentra R$ 7,53 milhões em contratos de informática",
-      "subheadline": "Esse valor representa a maior parte do arquivo analisado.",
-      "traducao_pratica": "Cerca de R$ 627,7 mil por mês durante 12 meses.",
-      "por_que_preocupa": "Pela concentração e dimensão do gasto, isso exige explicação clara.",
-      "termo_explicado": "",
-      "gravidade_editorial": "alta"
-    }}
-  ],
-  "glossario_contextual": [
+  "insight_principal": {{
+    "categoria_editorial": "concentracao_fornecedor",
+    "titulo": "Concentração de valor em um só fornecedor",
+    "headline": "Fornecedor concentra R$ 7,53 milhões em contratos de informática",
+    "subheadline": "Esse valor representa a maior parte do arquivo analisado.",
+    "traducao_pratica": "Cerca de R$ 627,7 mil por mês durante 12 meses.",
+    "por_que_preocupa": "Esse valor exige explicação pela dimensão do gasto e pela concentração em um único fornecedor.",
+    "envolvido_principal": "Distribuidora Completa",
+    "gravidade_editorial": "alta"
+  }},
+  "explicacoes_contextuais": [
     {{
       "termo": "inexigibilidade",
       "explicacao_curta": "Contratação sem competição formal, permitida apenas em situações específicas."
     }}
   ],
+  "blocos_executivos": {{
+    "o_que_aconteceu": "Fornecedor concentra R$ 7,53 milhões em contratos de informática.",
+    "quanto_custa": "R$ 7,53 milhões no total.",
+    "peso_no_arquivo": "82,9% do valor analisado.",
+    "traducao_do_valor": "Cerca de R$ 627,7 mil por mês durante 12 meses.",
+    "por_que_preocupa": "A maior parte do gasto ficou concentrada em um único fornecedor.",
+    "proxima_pergunta": "Quais documentos justificam esse volume e essa concentração?"
+  }},
   "creative_copy": {{
     "headline": "R$ 7,53 milhões em contratos de informática",
     "valor_destaque": "R$ 7,53 mi",
@@ -1196,19 +1496,37 @@ RESPONDA APENAS EM JSON VÁLIDO NESTA ESTRUTURA:
   }}
 }}
 """
-            try:
-                model = genai.GenerativeModel(GEMINI_MODEL)
-                ai_resp = model.generate_content(prompt)
-                ai_text = getattr(ai_resp, "text", "").strip()
-                ai_json = safe_parse_ai_json(ai_text)
-            except Exception as e:
+            ai_result = run_ai_with_fallback(prompt, safe_parse_ai_json)
+            if ai_result.get("success"):
+                ai_json = ai_result["data"]
+            else:
+                friendly_ai_message = (
+                    "A análise matemática foi concluída, mas a interpretação automática "
+                    "ficou temporariamente indisponível. Tente novamente em alguns minutos."
+                )
                 ai_json = {
-                    "resumo_interpretativo": (
-                        "Análise matemática concluída, mas houve erro na interpretação textual da IA: "
-                        f"{str(e)}"
-                    ),
-                    "resumo_contextual_ia": "Resumo contextual indisponível por erro na interpretação textual da IA.",
+                    "resumo_interpretativo": friendly_ai_message,
+                    "resumo_contextual_ia": friendly_ai_message,
                     "alertas": [],
+                    "insight_principal": {
+                        "categoria_editorial": "",
+                        "titulo": "Ponto de atenção no arquivo",
+                        "headline": "",
+                        "subheadline": "",
+                        "traducao_pratica": "",
+                        "por_que_preocupa": "",
+                        "envolvido_principal": "",
+                        "gravidade_editorial": "",
+                    },
+                    "explicacoes_contextuais": [],
+                    "blocos_executivos": {
+                        "o_que_aconteceu": "",
+                        "quanto_custa": "",
+                        "peso_no_arquivo": "",
+                        "traducao_do_valor": "",
+                        "por_que_preocupa": "",
+                        "proxima_pergunta": "Quais documentos justificam esse valor, esse volume ou essa concentração?",
+                    },
                     "insights_executivos": [],
                     "glossario_contextual": [],
                     "creative_copy": {
@@ -1219,6 +1537,7 @@ RESPONDA APENAS EM JSON VÁLIDO NESTA ESTRUTURA:
                         "rodape": "Fonte: Fiscaliza.AI · dados públicos analisados",
                     },
                 }
+            ai_json["provider_meta"] = ai_result.get("provider_meta", {})
 
         if is_contracts:
             ai_json["resumo_interpretativo"] = contract_safe_text(
@@ -1245,6 +1564,37 @@ RESPONDA APENAS EM JSON VÁLIDO NESTA ESTRUTURA:
                         "termo_explicado",
                     ]:
                         insight[key] = contract_safe_text(insight.get(key, ""))
+            if isinstance(ai_json.get("insight_principal"), dict):
+                for key in [
+                    "titulo",
+                    "headline",
+                    "subheadline",
+                    "traducao_pratica",
+                    "por_que_preocupa",
+                    "envolvido_principal",
+                ]:
+                    ai_json["insight_principal"][key] = contract_safe_text(
+                        ai_json["insight_principal"].get(key, "")
+                    )
+            if isinstance(ai_json.get("blocos_executivos"), dict):
+                for key in [
+                    "o_que_aconteceu",
+                    "quanto_custa",
+                    "peso_no_arquivo",
+                    "traducao_do_valor",
+                    "por_que_preocupa",
+                    "proxima_pergunta",
+                ]:
+                    ai_json["blocos_executivos"][key] = contract_safe_text(
+                        ai_json["blocos_executivos"].get(key, "")
+                    )
+            if isinstance(ai_json.get("explicacoes_contextuais"), list):
+                for item in ai_json["explicacoes_contextuais"]:
+                    if not isinstance(item, dict):
+                        continue
+                    item["explicacao_curta"] = contract_safe_text(
+                        item.get("explicacao_curta", "")
+                    )
             if isinstance(ai_json.get("creative_copy"), dict):
                 for key in ["headline", "valor_destaque", "frase_impacto", "cta", "rodape"]:
                     ai_json["creative_copy"][key] = contract_safe_text(
@@ -1468,16 +1818,35 @@ def creative_extract_json(text):
         return {}
 
 
+def creative_parse_json_or_raise(text):
+    parsed = creative_extract_json(text)
+    if not parsed:
+        raise ValueError("invalid_json")
+    return parsed
+
+
 def creative_normalize_output(parsed, fallback_context):
     creative_copy = fallback_context.get("creative_copy")
     if not isinstance(creative_copy, dict):
         creative_copy = {}
+    insight_principal = fallback_context.get("insight_principal")
+    if not isinstance(insight_principal, dict):
+        insight_principal = {}
+    blocos_executivos = fallback_context.get("blocos_executivos")
+    if not isinstance(blocos_executivos, dict):
+        blocos_executivos = {}
 
     title = creative_text(
         parsed.get("title"),
         creative_text(
             creative_copy.get("headline"),
-            f"Alerta em {creative_text(fallback_context.get('category_label'), 'dado público')}",
+            creative_text(
+                insight_principal.get("headline"),
+                creative_text(
+                    blocos_executivos.get("o_que_aconteceu"),
+                    f"Alerta em {creative_text(fallback_context.get('category_label'), 'dado público')}",
+                ),
+            ),
         ),
     )
 
@@ -1494,8 +1863,14 @@ def creative_normalize_output(parsed, fallback_context):
         creative_text(
             creative_copy.get("frase_impacto"),
             creative_text(
-                fallback_context.get("alert_explanation"),
-                "Um alerta foi identificado a partir dos dados analisados."
+                insight_principal.get("por_que_preocupa"),
+                creative_text(
+                    blocos_executivos.get("por_que_preocupa"),
+                    creative_text(
+                        fallback_context.get("alert_explanation"),
+                        "Um alerta foi identificado a partir dos dados analisados."
+                    ),
+                ),
             ),
         ),
     )
@@ -1579,6 +1954,12 @@ def generate_creative(alert_id: str):
         creative_copy = ai_output.get("creative_copy")
         if not isinstance(creative_copy, dict):
             creative_copy = {}
+        insight_principal = ai_output.get("insight_principal")
+        if not isinstance(insight_principal, dict):
+            insight_principal = {}
+        blocos_executivos = ai_output.get("blocos_executivos")
+        if not isinstance(blocos_executivos, dict):
+            blocos_executivos = {}
 
         related_record = None
         source_record_id = alert_record.get("source_record_id")
@@ -1642,6 +2023,8 @@ def generate_creative(alert_id: str):
             "upload_file_name": upload_record.get("file_name"),
             "resumo_interpretativo": ai_output.get("resumo_interpretativo"),
             "resumo_contextual_ia": ai_output.get("resumo_contextual_ia"),
+            "insight_principal": insight_principal,
+            "blocos_executivos": blocos_executivos,
             "creative_copy": creative_copy,
             "tipo_contexto": resumo_contextual.get("tipo_contexto"),
             "raw_fields": raw_fields,
@@ -1649,8 +2032,15 @@ def generate_creative(alert_id: str):
 
         fallback_creative = creative_normalize_output({}, context)
         ai_used = False
+        provider_meta = {
+            "provider_used": None,
+            "model_used": None,
+            "fallback_used": False,
+            "attempted_providers": [],
+            "failed_attempts": [],
+        }
 
-        if os.getenv("AI_PROVIDER", "none").lower() == "gemini" and os.getenv("GEMINI_API_KEY"):
+        if any([GEMINI_API_KEY, GROQ_API_KEY, OPENROUTER_API_KEY]):
             prompt = f"""
 Você é um editor de post social do Fiscaliza.AI.
 
@@ -1683,19 +2073,21 @@ FORMATO OBRIGATÓRIO:
   "footer": "Fonte: Fiscaliza.AI · dados públicos analisados"
 }}
 """
-            model = genai.GenerativeModel(GEMINI_MODEL)
-            ai_resp = model.generate_content(prompt)
-            ai_text = getattr(ai_resp, "text", "").strip()
+            ai_result = run_ai_with_fallback(prompt, creative_parse_json_or_raise)
+            provider_meta = ai_result.get("provider_meta", provider_meta)
 
-            parsed = creative_extract_json(ai_text)
-            creative = creative_normalize_output(parsed, context)
-            ai_used = True
+            if ai_result.get("success"):
+                creative = creative_normalize_output(ai_result["data"], context)
+                ai_used = True
+            else:
+                creative = fallback_creative
         else:
             creative = fallback_creative
 
         return {
             "status": "success",
             "ai_used": ai_used,
+            "provider_meta": provider_meta,
             "alert_id": alert_record.get("id"),
             "upload_id": upload_id,
             "source_record_id": source_record_id,
