@@ -81,6 +81,12 @@ function asRecordArray(value: unknown): JsonObject[] {
   );
 }
 
+function recordOrEmpty(value: unknown): JsonObject {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value)
+    ? (value as JsonObject)
+    : {};
+}
+
 function parseAmount(value: unknown) {
   if (value === null || value === undefined || value === "") return 0;
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -250,8 +256,12 @@ function findMatchingExecutiveInsight(
     insights.find((item) => {
       const headline = normalizeText(item.headline);
       const subheadline = normalizeText(item.subheadline);
+      const involved = normalizeText(item.envolvido_principal);
       const sameSupplier =
-        supplier && (headline.includes(supplier) || subheadline.includes(supplier));
+        supplier &&
+        (headline.includes(supplier) ||
+          subheadline.includes(supplier) ||
+          involved.includes(supplier));
       const sameAmount =
         amount > 0 &&
         (headline.includes(String(amount).replace(".", ",")) ||
@@ -487,9 +497,17 @@ export default function AlertDetailPage() {
 
   const aiAlerts = asRecordArray(aiOutput["alertas"]);
   const matchedAiAlert = findMatchingAiAlert(alert, aiAlerts);
-  const insightsExecutivos = asRecordArray(aiOutput["insights_executivos"]);
+  const canonicalInsight = recordOrEmpty(aiOutput["insight_principal"]);
+  const insightsExecutivos = [
+    ...(Object.keys(canonicalInsight).length > 0 ? [canonicalInsight] : []),
+    ...asRecordArray(aiOutput["insights_executivos"]),
+  ];
   const matchedInsight = findMatchingExecutiveInsight(alert, insightsExecutivos);
-  const glossarioContextual = asRecordArray(aiOutput["glossario_contextual"]);
+  const glossarioContextual =
+    asRecordArray(aiOutput["explicacoes_contextuais"]).length > 0
+      ? asRecordArray(aiOutput["explicacoes_contextuais"])
+      : asRecordArray(aiOutput["glossario_contextual"]);
+  const blocosExecutivos = recordOrEmpty(aiOutput["blocos_executivos"]);
 
   const firstRecord = records[0] || null;
   const rawEntries = rawPreviewEntries(firstRecord);
@@ -521,13 +539,18 @@ export default function AlertDetailPage() {
     asRecordArray(inputSummary["alerta_potencial_repeticao_contratual"]).length ||
     asRecordArray(inputSummary["alerta_potencial_duplicidade"]).length;
   const executiveHeadline =
+    textOrEmpty(matchedInsight?.titulo) ||
     textOrEmpty(matchedInsight?.headline) || alert?.title || "Alerta sem título";
   const executiveSubheadline =
+    textOrEmpty(blocosExecutivos["o_que_aconteceu"]) ||
     textOrEmpty(matchedInsight?.subheadline) ||
+    textOrEmpty(matchedInsight?.headline) ||
     alert?.explanation ||
     "Este alerta merece leitura porque mantém vínculo com os dados de origem.";
   const practicalTranslation =
     textOrEmpty(matchedInsight?.traducao_pratica) ||
+    textOrEmpty(blocosExecutivos["traducao_do_valor"]) ||
+    textOrEmpty(blocosExecutivos["peso_no_arquivo"]) ||
     (monthlyEstimate > 0
       ? `${formatMoney(monthlyEstimate)} por mês em uma vigência estimada de ${months} meses.`
       : percentOfUpload > 0
@@ -535,6 +558,7 @@ export default function AlertDetailPage() {
         : "");
   const concernCopy =
     textOrEmpty(matchedInsight?.por_que_preocupa) ||
+    textOrEmpty(blocosExecutivos["por_que_preocupa"]) ||
     "O dado concentra valor ou padrão relevante e exige explicação antes de qualquer conclusão.";
   const termExplained =
     textOrEmpty(matchedInsight?.termo_explicado) ||
@@ -817,6 +841,12 @@ export default function AlertDetailPage() {
               <strong className="text-[var(--invest-heading)]">Registros candidatos encontrados:</strong>{" "}
               {records.length}
             </p>
+            {textOrEmpty(blocosExecutivos["proxima_pergunta"]) && (
+              <p>
+                <strong className="text-[var(--invest-heading)]">Pergunta que fica:</strong>{" "}
+                {textOrEmpty(blocosExecutivos["proxima_pergunta"])}
+              </p>
+            )}
           </div>
         </div>
 

@@ -62,6 +62,12 @@ function asRecordArray(value: unknown): Record<string, unknown>[] {
   );
 }
 
+function recordOrEmpty(value: unknown): Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
 function textOrEmpty(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -248,10 +254,15 @@ export default function DashboardPage() {
 
   const selectedInput = parseJson(selectedLog?.input_summary);
   const selectedAiOutput = parseJson(selectedLog?.ai_output);
+  const insightPrincipal = recordOrEmpty(selectedAiOutput["insight_principal"]);
+  const blocosExecutivos = recordOrEmpty(selectedAiOutput["blocos_executivos"]);
   const insightsExecutivos = asRecordArray(
     selectedAiOutput["insights_executivos"]
   );
-  const primaryInsight = insightsExecutivos[0] || null;
+  const primaryInsight =
+    Object.keys(insightPrincipal).length > 0
+      ? insightPrincipal
+      : insightsExecutivos[0] || null;
 
   const totalRegistros = Number(selectedInput["total_registros"] || 0);
   const valorTotal = parseAmount(selectedInput["valor_total_soma"]);
@@ -316,21 +327,29 @@ export default function DashboardPage() {
       ? (primaryAlertAmount / valorTotal) * 100
       : 0;
   const primaryHeadline =
+    textOrEmpty(primaryInsight?.["titulo"]) ||
     textOrEmpty(primaryInsight?.["headline"]) ||
+    textOrEmpty(blocosExecutivos["o_que_aconteceu"]) ||
     primaryAlert?.title ||
     "Nenhum alerta encontrado neste upload";
   const primarySubheadline =
+    textOrEmpty(primaryInsight?.["headline"]) ||
     textOrEmpty(primaryInsight?.["subheadline"]) ||
+    textOrEmpty(blocosExecutivos["peso_no_arquivo"]) ||
     primaryAlert?.explanation ||
     "Quando houver alertas, o principal sinal aparecerá aqui com valor, fornecedor e motivo.";
   const primaryTranslation =
     textOrEmpty(primaryInsight?.["traducao_pratica"]) ||
+    textOrEmpty(blocosExecutivos["traducao_do_valor"]) ||
+    textOrEmpty(blocosExecutivos["quanto_custa"]) ||
     (primaryShare > 0
       ? `${formatPercent(primaryShare)} do valor analisado no upload.`
       : "Peso no total ainda não calculado.");
   const primaryConcern =
     textOrEmpty(primaryInsight?.["por_que_preocupa"]) ||
+    textOrEmpty(blocosExecutivos["por_que_preocupa"]) ||
     "Este ponto merece leitura porque concentra valor, fornecedor ou padrão relevante na análise já salva.";
+  const nextQuestion = textOrEmpty(blocosExecutivos["proxima_pergunta"]);
 
   if (loading) {
     return (
@@ -433,6 +452,11 @@ export default function DashboardPage() {
                   <div className="mt-4 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-950">
                     <p className="font-black">Por que isso preocupa</p>
                     <p className="mt-1">{primaryConcern}</p>
+                    {nextQuestion && (
+                      <p className="mt-3 font-black">
+                        Próxima pergunta: {nextQuestion}
+                      </p>
+                    )}
                   </div>
                   {primaryAlert?.supplier_name && (
                     <p className="mt-4 text-sm font-bold text-[var(--invest-heading)]">

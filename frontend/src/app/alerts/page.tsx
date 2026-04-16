@@ -48,6 +48,12 @@ function asRecordArray(value: unknown): Record<string, unknown>[] {
   );
 }
 
+function recordOrEmpty(value: unknown): Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
 function textOrEmpty(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -122,8 +128,12 @@ function findInsightForAlert(
     insights.find((item) => {
       const headline = normalizeText(item["headline"]);
       const subheadline = normalizeText(item["subheadline"]);
+      const involved = normalizeText(item["envolvido_principal"]);
       const sameSupplier =
-        supplier && (headline.includes(supplier) || subheadline.includes(supplier));
+        supplier &&
+        (headline.includes(supplier) ||
+          subheadline.includes(supplier) ||
+          involved.includes(supplier));
       const sameAmount =
         amount > 0 &&
         (normalizeText(item["headline"]).includes(String(amount).replace(".", ",")) ||
@@ -221,9 +231,14 @@ export default function AlertsPage() {
   function insightFor(alert: AlertRecord) {
     const log = latestLogByUpload.get(alert.upload_id);
     const aiOutput = parseJson(log?.ai_output);
+    const principal = recordOrEmpty(aiOutput["insight_principal"]);
+    const candidates = [
+      ...(Object.keys(principal).length > 0 ? [principal] : []),
+      ...asRecordArray(aiOutput["insights_executivos"]),
+    ];
     return findInsightForAlert(
       alert,
-      asRecordArray(aiOutput["insights_executivos"])
+      candidates
     );
   }
 
@@ -355,7 +370,10 @@ export default function AlertsPage() {
       <section className="grid grid-cols-1 gap-4">
         {filteredAlerts.map((alert) => {
           const insight = insightFor(alert);
-          const headline = textOrEmpty(insight?.["headline"]) || alert.title;
+          const headline =
+            textOrEmpty(insight?.["titulo"]) ||
+            textOrEmpty(insight?.["headline"]) ||
+            alert.title;
           const reason =
             textOrEmpty(insight?.["por_que_preocupa"]) ||
             textOrEmpty(insight?.["subheadline"]) ||
