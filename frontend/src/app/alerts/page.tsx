@@ -65,6 +65,18 @@ function normalizeText(value: unknown) {
     .replace(/\s+/g, " ");
 }
 
+function isBlankValue(value: unknown) {
+  const normalized = normalizeText(value);
+  return (
+    !normalized ||
+    normalized === "none" ||
+    normalized === "null" ||
+    normalized === "nan" ||
+    normalized === "nao informado" ||
+    normalized === "não informado"
+  );
+}
+
 function parseAmount(value: unknown) {
   if (value === null || value === undefined || value === "") return 0;
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
@@ -118,30 +130,99 @@ function roundMoney(value: unknown) {
   return Math.round(parseAmount(value) * 100) / 100;
 }
 
+function alertSequenceLabel(index: number) {
+  return `Alerta ${String(index + 1).padStart(2, "0")}`;
+}
+
+function hasAnyTerm(text: string, terms: string[]) {
+  return terms.some((term) => text.includes(term));
+}
+
+function alertEditorialFamily(alert: AlertRecord) {
+  const text = normalizeText(`${alert.title} ${alert.explanation}`);
+
+  if (hasAnyTerm(text, ["inexigibilidade", "sem disputa"])) {
+    return "inexigibilidade";
+  }
+  if (hasAnyTerm(text, ["dispensa"])) return "dispensa";
+  if (hasAnyTerm(text, ["concentr", "fornecedor"])) return "concentracao";
+  if (hasAnyTerm(text, ["repet", "duplic"])) return "repeticao";
+
+  return "geral";
+}
+
+function insightEditorialFamily(insight: Record<string, unknown>) {
+  const text = normalizeText(
+    `${insight["categoria_editorial"]} ${insight["tipo"]} ${insight["titulo"]} ${insight["headline"]} ${insight["subheadline"]}`
+  );
+
+  if (hasAnyTerm(text, ["inexigibilidade", "sem disputa"])) {
+    return "inexigibilidade";
+  }
+  if (hasAnyTerm(text, ["dispensa"])) return "dispensa";
+  if (hasAnyTerm(text, ["concentr"])) return "concentracao";
+  if (hasAnyTerm(text, ["repet", "duplic"])) return "repeticao";
+
+  return "geral";
+}
+
+function supplierLabel(alert: AlertRecord) {
+  if (!isBlankValue(alert.supplier_name)) {
+    return `Fornecedor: ${alert.supplier_name}`;
+  }
+
+  const family = alertEditorialFamily(alert);
+  if (family === "inexigibilidade" || family === "dispensa") {
+    return "Escopo do alerta: modalidade recorrente, sem fornecedor único";
+  }
+
+  return "Fornecedor: não se aplica";
+}
+
 function findInsightForAlert(
   alert: AlertRecord,
   insights: Record<string, unknown>[]
 ) {
   const supplier = normalizeText(alert.supplier_name);
   const amount = roundMoney(alert.amount);
+  const alertTitle = normalizeText(alert.title);
+  const alertFamily = alertEditorialFamily(alert);
+
   return (
     insights.find((item) => {
+      const title = normalizeText(item["titulo"]);
       const headline = normalizeText(item["headline"]);
       const subheadline = normalizeText(item["subheadline"]);
       const involved = normalizeText(item["envolvido_principal"]);
+      const insightFamily = insightEditorialFamily(item);
+      const insightAmount = roundMoney(item["valor_principal"] ?? item["amount"]);
+
+      const sameTitle =
+        Boolean(alertTitle) &&
+        (alertTitle === title ||
+          alertTitle === headline ||
+          title.includes(alertTitle) ||
+          headline.includes(alertTitle));
+
       const sameSupplier =
-        supplier &&
-        (headline.includes(supplier) ||
+        Boolean(supplier) &&
+        (supplier === involved ||
+          involved.includes(supplier) ||
+          headline.includes(supplier) ||
           subheadline.includes(supplier) ||
           involved.includes(supplier));
+
       const sameAmount =
-        amount > 0 &&
-        (normalizeText(item["headline"]).includes(String(amount).replace(".", ",")) ||
-          normalizeText(item["subheadline"]).includes(String(amount).replace(".", ",")));
-      return sameSupplier || sameAmount;
-    }) ||
-    insights[0] ||
-    null
+        amount > 0 && insightAmount > 0 && Math.abs(amount - insightAmount) < 1;
+
+      const sameFamily = alertFamily !== "geral" && alertFamily === insightFamily;
+
+      return (
+        sameTitle ||
+        (sameAmount && (sameSupplier || sameFamily)) ||
+        (sameSupplier && sameFamily)
+      );
+    }) || null
   );
 }
 
@@ -254,6 +335,19 @@ export default function AlertsPage() {
   const topAlert = filteredAlerts
     .slice()
     .sort((a, b) => parseAmount(b.amount) - parseAmount(a.amount))[0];
+
+  const alertNumbers = useMemo(() => {
+    const counters = new Map<string, number>();
+    const map = new Map<string, string>();
+
+    for (const alert of alerts) {
+      const current = counters.get(alert.upload_id) || 0;
+      counters.set(alert.upload_id, current + 1);
+      map.set(alert.id, alertSequenceLabel(current));
+    }
+
+    return map;
+  }, [alerts]);
 
   if (loading) {
     return (
@@ -380,12 +474,17 @@ export default function AlertsPage() {
             alert.explanation ||
             "Este alerta mantém vínculo com a origem e merece leitura.";
 
+          const sequence = alertNumbers.get(alert.id) || "Alerta";
+
           return (
             <article
               key={alert.id}
-              className="group grid gap-5 rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)] transition duration-200 hover:border-[rgba(49,92,255,0.32)] hover:shadow-[var(--invest-shadow)] xl:grid-cols-[180px_minmax(0,1fr)_230px]"
+              className="group grid gap-4 rounded-lg border border-[var(--invest-border)] bg-white p-4 shadow-[var(--invest-shadow-soft)] transition duration-200 hover:border-[rgba(49,92,255,0.32)] hover:shadow-[var(--invest-shadow)] xl:grid-cols-[150px_minmax(0,1fr)_210px]"
             >
               <div className="space-y-3">
+                <span className="app-chip border-[rgba(49,92,255,0.28)] bg-[#f2f5ff] text-[var(--invest-primary)]">
+                  {sequence}
+                </span>
                 <StatusPill tone={severityTone(alert.severity)}>
                   {alert.severity || "baixa"}
                 </StatusPill>
@@ -401,17 +500,17 @@ export default function AlertsPage() {
               </div>
 
               <div>
-                <h2 className="text-xl font-black leading-tight text-[var(--invest-heading)]">
+                <h2 className="text-lg font-black leading-tight text-[var(--invest-heading)]">
                   {headline}
                 </h2>
 
-                <p className="mt-3 max-w-4xl text-sm leading-7 text-[var(--invest-muted)]">
+                <p className="mt-2 max-w-4xl text-sm leading-6 text-[var(--invest-muted)]">
                   {reason}
                 </p>
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   <span className="app-chip">
-                    Fornecedor: {alert.supplier_name || "Não informado"}
+                    {supplierLabel(alert)}
                   </span>
                   <span className="app-chip">
                     Documento: {alert.report_type || alert.report_label || "Não informado"}
@@ -420,7 +519,7 @@ export default function AlertsPage() {
               </div>
 
               <div className="flex flex-col items-start justify-between gap-4 xl:items-end">
-                <p className="invest-number text-2xl font-black text-[var(--invest-heading)]">
+                <p className="invest-number text-xl font-black text-[var(--invest-heading)]">
                   {formatMoney(parseAmount(alert.amount))}
                 </p>
                 <Link

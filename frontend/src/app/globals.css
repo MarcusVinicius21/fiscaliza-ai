@@ -99,7 +99,7 @@ a[href] {
 
 .page-shell {
   display: grid;
-  gap: 24px;
+  gap: 18px;
 }
 
 .page-header,
@@ -206,7 +206,7 @@ a[href] {
   border: 1px solid var(--invest-border);
   border-radius: var(--invest-radius);
   background: var(--invest-surface);
-  padding: 1rem;
+  padding: 0.85rem;
   box-shadow: var(--invest-shadow-soft);
 }
 
@@ -229,7 +229,7 @@ a[href] {
 
 .metric-value {
   color: var(--invest-heading);
-  font-size: 1.75rem;
+  font-size: 1.45rem;
   font-weight: 850;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
@@ -386,7 +386,7 @@ a[href] {
 
 .invest-table th,
 .data-table th {
-  padding: 0.9rem 1rem;
+  padding: 0.72rem 0.8rem;
   color: var(--invest-muted);
   font-size: 0.72rem;
   font-weight: 850;
@@ -398,7 +398,7 @@ a[href] {
 .invest-table td,
 .data-table td {
   border-top: 1px solid var(--invest-border);
-  padding: 1rem;
+  padding: 0.72rem 0.8rem;
   color: var(--invest-text);
   vertical-align: top;
 }

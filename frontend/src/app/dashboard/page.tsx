@@ -86,6 +86,22 @@ function parseAmount(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function parseStrictMoney(value: unknown) {
+  if (value === null || value === undefined || value === "") return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+
+  const raw = String(value).trim();
+  const withoutCurrency = raw.replace(/r\$/gi, "").trim();
+
+  if (!withoutCurrency) return 0;
+  if (/(milh|bilh|trilh|\bmi\b|\bbi\b|\bmil\b)/i.test(withoutCurrency)) {
+    return 0;
+  }
+  if (/[^0-9.,\s-]/.test(withoutCurrency)) return 0;
+
+  return parseAmount(raw);
+}
+
 function normalizeLabel(value: unknown) {
   const txt = String(value || "").trim();
   return txt || "Não informado";
@@ -130,20 +146,98 @@ function formatDate(value?: string | null) {
   return date.toLocaleDateString("pt-BR");
 }
 
+function InfoHint({
+  text,
+  align = "right",
+}: {
+  text: string;
+  align?: "left" | "center" | "right";
+}) {
+  const alignClass =
+    align === "left"
+      ? "left-0"
+      : align === "center"
+        ? "left-1/2 -translate-x-1/2"
+        : "right-0";
+
+  return (
+    <span className="group relative inline-flex align-middle">
+      <button
+        type="button"
+        aria-label={text}
+        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[var(--invest-border)] bg-white text-[0.72rem] font-black text-[var(--invest-muted)] outline-none transition hover:border-[var(--invest-primary)] hover:text-[var(--invest-primary)] focus:border-[var(--invest-primary)] focus:text-[var(--invest-primary)] focus:ring-4 focus:ring-blue-100"
+      >
+        i
+      </button>
+      <span
+        className={`pointer-events-none absolute top-9 z-40 hidden w-64 max-w-[calc(100vw-2rem)] rounded-lg border border-[var(--invest-border)] bg-white p-2.5 text-left text-xs font-semibold leading-5 text-[var(--invest-muted)] shadow-[0_16px_36px_rgba(15,23,42,0.12)] group-hover:block group-focus-within:block ${alignClass}`}
+      >
+        {text}
+      </span>
+    </span>
+  );
+}
+
+function ChapterHeader({
+  label,
+  title,
+}: {
+  label: string;
+  title: string;
+}) {
+  return (
+    <div className="flex items-end justify-between gap-3">
+      <div>
+        <p className="invest-eyebrow">{label}</p>
+        <h2 className="mt-1 text-lg font-black text-[var(--invest-heading)]">
+          {title}
+        </h2>
+      </div>
+    </div>
+  );
+}
+
 function MetricCard({
   label,
   value,
   note,
+  help,
 }: {
   label: string;
   value: string | number;
   note?: string;
+  help?: string;
 }) {
   return (
     <div className="metric-card">
-      <p className="metric-label">{label}</p>
+      <div className="flex items-start justify-between gap-3">
+        <p className="metric-label">{label}</p>
+        {help && <InfoHint text={help} />}
+      </div>
       <p className="metric-value mt-3">{value}</p>
       {note && <p className="mt-2 text-xs text-[var(--invest-muted)]">{note}</p>}
+    </div>
+  );
+}
+
+function SectionTitle({
+  eyebrow,
+  title,
+  help,
+}: {
+  eyebrow: string;
+  title: string;
+  help: string;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <p className="invest-eyebrow">{eyebrow}</p>
+        <h2 className="mt-2 text-lg font-black text-[var(--invest-heading)]">
+          {title}
+        </h2>
+      </div>
+      <InfoHint text={help} />
     </div>
   );
 }
@@ -321,11 +415,22 @@ export default function DashboardPage() {
     .slice()
     .sort((a, b) => parseAmount(b.amount) - parseAmount(a.amount))[0];
 
-  const primaryAlertAmount = parseAmount(primaryAlert?.amount);
+  const primaryAlertExplicitAmount = parseAmount(primaryAlert?.amount);
+  const insightAmount = parseAmount(primaryInsight?.["valor_principal"]);
+  const blocosAmount = parseStrictMoney(blocosExecutivos["quanto_custa"]);
+  const primaryAlertAmount =
+    primaryAlertExplicitAmount || insightAmount || blocosAmount || 0;
   const primaryShare =
     valorTotal > 0 && primaryAlertAmount > 0
       ? (primaryAlertAmount / valorTotal) * 100
       : 0;
+  const primarySeverity =
+    primaryAlert?.severity ||
+    textOrEmpty(primaryInsight?.["gravidade_editorial"]) ||
+    "media";
+  const primarySupplier =
+    primaryAlert?.supplier_name ||
+    textOrEmpty(primaryInsight?.["envolvido_principal"]);
   const primaryHeadline =
     textOrEmpty(primaryInsight?.["titulo"]) ||
     textOrEmpty(primaryInsight?.["headline"]) ||
@@ -350,6 +455,41 @@ export default function DashboardPage() {
     textOrEmpty(blocosExecutivos["por_que_preocupa"]) ||
     "Este ponto merece leitura porque concentra valor, fornecedor ou padrão relevante na análise já salva.";
   const nextQuestion = textOrEmpty(blocosExecutivos["proxima_pergunta"]);
+  const hasInsightFallbackAlert = Boolean(
+    textOrEmpty(primaryInsight?.["titulo"]) ||
+      textOrEmpty(primaryInsight?.["headline"])
+  );
+  const insightFallbackAlert: AlertRecord | null =
+    selectedUpload && selectedAlerts.length === 0 && hasInsightFallbackAlert
+      ? {
+          id: `insight-${selectedUpload.id}`,
+          upload_id: selectedUpload.id,
+          city_id: selectedUpload.city_id,
+          category: selectedUpload.category,
+          report_type: selectedUpload.report_type,
+          report_label: selectedUpload.report_label,
+          title: primaryHeadline,
+          explanation: [primaryTranslation, primaryConcern]
+            .filter(
+              (item) =>
+                item && !String(item).toLowerCase().includes("peso no total")
+            )
+            .join(" "),
+          severity: primarySeverity,
+          amount: primaryAlertAmount,
+          supplier_name: primarySupplier,
+          created_at: selectedLog?.created_at || selectedUpload.created_at,
+          cities: selectedUpload.cities,
+        }
+      : null;
+  const visibleAlerts =
+    selectedAlerts.length > 0
+      ? selectedAlerts
+      : insightFallbackAlert
+        ? [insightFallbackAlert]
+        : [];
+  const visibleAlertCount =
+    selectedAlerts.length > 0 ? selectedAlerts.length : visibleAlerts.length;
 
   if (loading) {
     return (
@@ -367,14 +507,14 @@ export default function DashboardPage() {
 
   return (
     <div className="page-shell">
-      <section className="page-header p-6 md:p-8">
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_430px]">
+      <section className="page-header p-5 md:p-6">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div>
             <p className="invest-eyebrow">Painel principal</p>
-            <h1 className="invest-title mt-3 max-w-4xl text-3xl md:text-5xl">
+            <h1 className="invest-title mt-2 max-w-3xl text-2xl md:text-4xl">
               O que exige explicação agora.
             </h1>
-            <p className="invest-subtitle mt-4 max-w-3xl text-base">
+            <p className="invest-subtitle mt-3 max-w-2xl text-sm">
               Comece pelo maior sinal de atenção do arquivo. O painel usa a
               análise já pronta e mantém vínculo com a origem.
             </p>
@@ -400,7 +540,7 @@ export default function DashboardPage() {
             </select>
 
             {selectedUpload && (
-              <div className="mt-4 rounded-lg border border-[var(--invest-border)] bg-[#fbfcff] p-4 text-sm text-[var(--invest-muted)]">
+              <div className="mt-3 rounded-lg border border-[var(--invest-border)] bg-[#fbfcff] p-3 text-sm text-[var(--invest-muted)]">
                 <p className="font-bold text-[var(--invest-heading)]">
                   {selectedUpload.file_name}
                 </p>
@@ -424,11 +564,28 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <MetricCard label="Cidades" value={cityCount} />
-        <MetricCard label="Uploads processados" value={uploadsProcessados.length} />
-        <MetricCard label="Uploads analisados" value={uploadsAnalisados.length} />
-        <MetricCard label="Alertas gerados" value={alerts.length} />
+      <ChapterHeader label="Bloco 1" title="Visão rápida" />
+      <section className="grid grid-cols-1 gap-3 md:grid-cols-4">
+        <MetricCard
+          label="Cidades"
+          value={cityCount}
+          help="Quantidade de cidades cadastradas para receber arquivos e análises."
+        />
+        <MetricCard
+          label="Uploads processados"
+          value={uploadsProcessados.length}
+          help="Arquivos que já passaram pelo tratamento inicial. Isso ainda não significa que a análise de alertas foi rodada."
+        />
+        <MetricCard
+          label="Uploads analisados"
+          value={uploadsAnalisados.length}
+          help="Arquivos que já tiveram a leitura matemática e a interpretação automática concluídas."
+        />
+        <MetricCard
+          label="Alertas gerados"
+          value={alerts.length}
+          help="Total de sinais salvos para consulta. Um alerta indica ponto de atenção, não conclusão de irregularidade."
+        />
       </section>
 
       {!selectedUpload ? (
@@ -438,18 +595,22 @@ export default function DashboardPage() {
         </div>
       ) : (
         <>
-          <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(360px,0.7fr)]">
-            <article className="insight-card p-6">
-              <p className="invest-eyebrow">Principal alerta do arquivo</p>
-              <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_220px]">
+          <ChapterHeader label="Bloco 2" title="Principal sinal do arquivo" />
+          <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+            <article className="insight-card p-5">
+              <div className="flex items-start justify-between gap-3">
+                <p className="invest-eyebrow">Principal alerta do arquivo</p>
+                <InfoHint text="É o sinal mais importante do arquivo selecionado, usando a análise já salva. Pode vir da tabela de alertas ou do insight principal da IA." />
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_210px]">
                 <div>
-                  <h2 className="max-w-3xl text-2xl font-black leading-tight text-[var(--invest-heading)] md:text-3xl">
+                  <h2 className="max-w-3xl text-xl font-black leading-tight text-[var(--invest-heading)] md:text-2xl">
                     {primaryHeadline}
                   </h2>
-                  <p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--invest-muted)]">
+                  <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--invest-muted)]">
                     {primarySubheadline}
                   </p>
-                  <div className="mt-4 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-950">
+                  <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm leading-6 text-orange-950">
                     <p className="font-black">Por que isso preocupa</p>
                     <p className="mt-1">{primaryConcern}</p>
                     {nextQuestion && (
@@ -458,25 +619,28 @@ export default function DashboardPage() {
                       </p>
                     )}
                   </div>
-                  {primaryAlert?.supplier_name && (
+                  {primarySupplier && (
                     <p className="mt-4 text-sm font-bold text-[var(--invest-heading)]">
-                      Fornecedor envolvido: {primaryAlert.supplier_name}
+                      Fornecedor envolvido: {primarySupplier}
                     </p>
                   )}
                 </div>
 
-                <div className="rounded-lg border border-[var(--invest-border)] bg-white p-4">
-                  <p className="metric-label">Quanto isso custa</p>
-                  <p className="invest-number mt-3 text-3xl font-black text-[var(--invest-heading)]">
+                <div className="rounded-lg border border-[var(--invest-border)] bg-white p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="metric-label">Quanto isso custa</p>
+                    <InfoHint text="Mostra o valor principal do alerta. O painel prioriza valor salvo no alerta e, se faltar, usa o valor numérico explícito do insight." />
+                  </div>
+                  <p className="invest-number mt-3 text-2xl font-black text-[var(--invest-heading)]">
                     {formatMoney(primaryAlertAmount)}
                   </p>
                   <p className="mt-3 text-sm text-[var(--invest-muted)]">
                     {primaryTranslation}
                   </p>
-                  {primaryAlert && (
+                  {(primaryAlert || hasInsightFallbackAlert) && (
                     <div className="mt-4">
-                      <StatusPill tone={severityTone(primaryAlert.severity)}>
-                        {primaryAlert.severity || "baixa"}
+                      <StatusPill tone={severityTone(primarySeverity)}>
+                        {primarySeverity}
                       </StatusPill>
                     </div>
                   )}
@@ -484,44 +648,66 @@ export default function DashboardPage() {
               </div>
             </article>
 
-            <aside className="rounded-lg border border-[var(--invest-border)] bg-white p-6 shadow-[var(--invest-shadow-soft)]">
-              <p className="invest-eyebrow">Resumo do problema</p>
-              <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
-                Leitura curta da IA
-              </h2>
+            <aside className="rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)]">
+              <SectionTitle
+                eyebrow="Resumo do problema"
+                title="Leitura curta da IA"
+                help="Texto de apoio gerado a partir da análise do arquivo. Ele resume o motivo de atenção sem substituir a prova."
+              />
               <p className="mt-4 text-sm leading-7 text-[var(--invest-muted)]">
                 {resumoContextualIa || resumoInterpretativo || "Resumo indisponível."}
               </p>
             </aside>
           </section>
 
-          <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <MetricCard label="Linhas analisadas" value={totalRegistros} />
-            <MetricCard label="Valor analisado" value={formatMoney(valorTotal)} />
-            <MetricCard label="Alertas deste arquivo" value={selectedAlerts.length} />
+          <section className="grid grid-cols-1 gap-3 md:grid-cols-4">
+            <MetricCard
+              label="Linhas analisadas"
+              value={totalRegistros}
+              help="Total de registros lidos neste arquivo depois do tratamento. É contagem de linhas, não necessariamente contratos únicos."
+            />
+            <MetricCard
+              label="Valor analisado"
+              value={formatMoney(valorTotal)}
+              help="Soma dos valores encontrados nas linhas consideradas na análise deste arquivo."
+            />
+            <MetricCard
+              label="Alertas deste arquivo"
+              value={visibleAlertCount}
+              help="Sinais vinculados ao upload selecionado. Eles ajudam a priorizar apuração, sem afirmar culpa."
+            />
             <MetricCard
               label="Linhas repetidas desconsideradas"
               value={repeticoesIgnoradas.length}
+              help="Linhas muito parecidas que o sistema tratou como repetição estrutural para não inflar a leitura."
             />
           </section>
 
-          <section className="grid grid-cols-1 gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-            <div className="rounded-lg border border-[var(--invest-border)] bg-white p-6 shadow-[var(--invest-shadow-soft)]">
-              <p className="invest-eyebrow">Resumo técnico</p>
-              <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
-                O que a análise registrou
-              </h2>
-              <div className="mt-5 space-y-4 text-sm leading-7 text-[var(--invest-muted)]">
+          <ChapterHeader label="Bloco 3" title="Leitura do arquivo" />
+          <section className="grid grid-cols-1 gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+            <div className="rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)]">
+              <SectionTitle
+                eyebrow="Resumo técnico"
+                title="O que a análise registrou"
+                help="Mostra a leitura resumida do arquivo e contagens de apoio. As quantidades aqui são de linhas analisadas."
+              />
+              <div className="mt-4 space-y-4 text-sm leading-6 text-[var(--invest-muted)]">
                 <p>{resumoInterpretativo || "Resumo interpretativo indisponível."}</p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div className="rounded-lg border border-[var(--invest-border)] bg-[#fbfcff] p-3">
-                    <p className="metric-label">Categoria do arquivo</p>
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="metric-label">Categoria do arquivo</p>
+                      <InfoHint text="Tipo de base informado no upload. Ele orienta a leitura do arquivo, mas não muda os dados brutos preservados." />
+                    </div>
                     <p className="mt-1 font-black text-[var(--invest-heading)]">
                       {categoryLabel(selectedUpload.category)}
                     </p>
                   </div>
                   <div className="rounded-lg border border-[var(--invest-border)] bg-[#fbfcff] p-3">
-                    <p className="metric-label">Padrões que merecem leitura</p>
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="metric-label">Padrões que merecem leitura</p>
+                      <InfoHint text="Quantidade de padrões relevantes que a análise identificou no arquivo, como concentração, repetição ou modalidade recorrente." />
+                    </div>
                     <p className="mt-1 font-black text-[var(--invest-heading)]">
                       {Array.isArray(repeticaoAnalitica)
                         ? repeticaoAnalitica.length
@@ -529,7 +715,10 @@ export default function DashboardPage() {
                     </p>
                   </div>
                   <div className="rounded-lg border border-[var(--invest-border)] bg-[#fbfcff] p-3">
-                    <p className="metric-label">Linhas desconsideradas</p>
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="metric-label">Linhas desconsideradas</p>
+                      <InfoHint text="Linhas repetidas ou muito parecidas que foram deixadas de fora da soma para evitar leitura inflada." />
+                    </div>
                     <p className="mt-1 font-black text-[var(--invest-heading)]">
                       {repeticoesIgnoradas.length}
                     </p>
@@ -538,11 +727,12 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="rounded-lg border border-[var(--invest-border)] bg-white p-6 shadow-[var(--invest-shadow-soft)]">
-              <p className="invest-eyebrow">Concentração</p>
-              <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
-                Quem concentra mais valor
-              </h2>
+            <div className="rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)]">
+              <SectionTitle
+                eyebrow="Concentração"
+                title="Quem concentra mais valor"
+                help="Ranking dos nomes que somam mais valor nas linhas analisadas. Não prova irregularidade sozinho, mas ajuda a priorizar leitura."
+              />
               <div className="mt-5 space-y-3">
                 {topConcentracao.slice(0, 5).map((item, index) => {
                   const value = parseAmount(item["valor_bruto"] ?? item["valor_total"]);
@@ -575,13 +765,16 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <ChapterHeader label="Bloco 4" title="Agrupamentos e maiores linhas" />
+          <ChapterHeader label="Bloco 5" title="Alertas e tipo de documento" />
+          <section className="grid grid-cols-1 gap-4 xl:grid-cols-[0.85fr_1.15fr]">
             <div className="overflow-hidden rounded-lg border border-[var(--invest-border)] bg-white shadow-[var(--invest-shadow-soft)]">
               <div className="border-b border-[var(--invest-border)] p-5">
-                <p className="invest-eyebrow">Maiores valores</p>
-                <h2 className="mt-2 text-lg font-black text-[var(--invest-heading)]">
-                  Itens que merecem leitura
-                </h2>
+                <SectionTitle
+                  eyebrow="Maiores valores"
+                  title="Linhas que merecem leitura"
+                  help="Mostra as linhas com maiores valores individuais no arquivo tratado."
+                />
               </div>
               <div className="invest-soft-scroll overflow-x-auto">
                 <table className="data-table">
@@ -612,10 +805,11 @@ export default function DashboardPage() {
 
             <div className="overflow-hidden rounded-lg border border-[var(--invest-border)] bg-white shadow-[var(--invest-shadow-soft)]">
               <div className="border-b border-[var(--invest-border)] p-5">
-                <p className="invest-eyebrow">Modalidade</p>
-                <h2 className="mt-2 text-lg font-black text-[var(--invest-heading)]">
-                  Como o valor se distribui
-                </h2>
+                <SectionTitle
+                  eyebrow="Modalidade"
+                  title="Linhas por modalidade"
+                  help="Mostra quantas linhas do arquivo aparecem por modalidade. Não representa necessariamente contratos únicos."
+                />
               </div>
               <div className="invest-soft-scroll overflow-x-auto">
                 <table className="data-table">
@@ -623,7 +817,7 @@ export default function DashboardPage() {
                     <tr>
                       <th>Modalidade</th>
                       <th className="text-right">Valor</th>
-                      <th className="text-right">Qtd.</th>
+                      <th className="text-right">Linhas</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -647,13 +841,14 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <div className="overflow-hidden rounded-lg border border-[var(--invest-border)] bg-white shadow-[var(--invest-shadow-soft)]">
               <div className="border-b border-[var(--invest-border)] p-5">
-                <p className="invest-eyebrow">Tipo do documento</p>
-                <h2 className="mt-2 text-lg font-black text-[var(--invest-heading)]">
-                  Agrupamento por ato
-                </h2>
+                <SectionTitle
+                  eyebrow="Tipo do documento"
+                  title="Linhas por tipo de ato"
+                  help="Mostra quantas linhas deste arquivo foram classificadas por tipo de ato, como contrato ou ata de registro de preço."
+                />
               </div>
               <div className="invest-soft-scroll overflow-x-auto">
                 <table className="data-table">
@@ -661,7 +856,7 @@ export default function DashboardPage() {
                     <tr>
                       <th>Tipo</th>
                       <th className="text-right">Valor</th>
-                      <th className="text-right">Qtd.</th>
+                      <th className="text-right">Linhas</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -686,15 +881,19 @@ export default function DashboardPage() {
 
             <div className="overflow-hidden rounded-lg border border-[var(--invest-border)] bg-white shadow-[var(--invest-shadow-soft)]">
               <div className="border-b border-[var(--invest-border)] p-5">
-                <p className="invest-eyebrow">Alertas</p>
-                <h2 className="mt-2 text-lg font-black text-[var(--invest-heading)]">
-                  Sinais deste arquivo
-                </h2>
+                <SectionTitle
+                  eyebrow="Alertas"
+                  title="Sinais deste arquivo"
+                  help="Lista os alertas vinculados ao upload selecionado. Se ainda não houver alerta salvo, o painel pode mostrar o insight principal como fallback visual."
+                />
               </div>
               <div className="divide-y divide-[var(--invest-border)]">
-                {selectedAlerts.map((alert) => (
+                {visibleAlerts.map((alert, index) => (
                   <article key={alert.id} className="p-5">
                     <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <span className="app-chip border-[rgba(49,92,255,0.28)] bg-[#f2f5ff] text-[var(--invest-primary)]">
+                        Alerta {String(index + 1).padStart(2, "0")}
+                      </span>
                       <StatusPill tone={severityTone(alert.severity)}>
                         {alert.severity || "baixa"}
                       </StatusPill>
@@ -713,7 +912,7 @@ export default function DashboardPage() {
                     )}
                   </article>
                 ))}
-                {selectedAlerts.length === 0 && (
+                {visibleAlerts.length === 0 && (
                   <p className="p-5 text-sm text-[var(--invest-muted)]">
                     Nenhum alerta encontrado para este upload.
                   </p>

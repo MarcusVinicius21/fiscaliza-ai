@@ -108,6 +108,91 @@ function normalizeText(value: unknown) {
     .replace(/\s+/g, " ");
 }
 
+function isBlankValue(value: unknown) {
+  const normalized = normalizeText(value);
+  return (
+    !normalized ||
+    normalized === "none" ||
+    normalized === "null" ||
+    normalized === "nan" ||
+    normalized === "nao informado" ||
+    normalized === "não informado"
+  );
+}
+
+function hasAnyTerm(text: string, terms: string[]) {
+  return terms.some((term) => text.includes(term));
+}
+
+function alertEditorialFamily(alert: AlertRecord | null) {
+  const text = normalizeText(`${alert?.title} ${alert?.explanation}`);
+
+  if (hasAnyTerm(text, ["inexigibilidade", "sem disputa"])) {
+    return "inexigibilidade";
+  }
+  if (hasAnyTerm(text, ["dispensa"])) return "dispensa";
+  if (hasAnyTerm(text, ["concentr", "fornecedor"])) return "concentracao";
+  if (hasAnyTerm(text, ["repet", "duplic"])) return "repeticao";
+
+  return "geral";
+}
+
+function insightEditorialFamily(insight: JsonObject) {
+  const text = normalizeText(
+    `${insight["categoria_editorial"]} ${insight["tipo"]} ${insight["titulo"]} ${insight["headline"]} ${insight["subheadline"]}`
+  );
+
+  if (hasAnyTerm(text, ["inexigibilidade", "sem disputa"])) {
+    return "inexigibilidade";
+  }
+  if (hasAnyTerm(text, ["dispensa"])) return "dispensa";
+  if (hasAnyTerm(text, ["concentr"])) return "concentracao";
+  if (hasAnyTerm(text, ["repet", "duplic"])) return "repeticao";
+
+  return "geral";
+}
+
+function supplierLabel(alert: AlertRecord | null) {
+  if (!isBlankValue(alert?.supplier_name)) {
+    return String(alert?.supplier_name || "");
+  }
+
+  const family = alertEditorialFamily(alert);
+  if (family === "inexigibilidade" || family === "dispensa") {
+    return "Modalidade recorrente, sem fornecedor único";
+  }
+
+  return "Não se aplica";
+}
+
+function modalityExplanation(family: string) {
+  if (family === "inexigibilidade") {
+    return "Inexigibilidade é contratação sem disputa formal, permitida apenas em situações específicas. Quando aparece muitas vezes no mesmo conjunto, o gasto merece atenção reforçada.";
+  }
+
+  if (family === "dispensa") {
+    return "Dispensa é contratação sem disputa formal em hipóteses específicas. Quando se repete no mesmo arquivo, exige leitura cuidadosa dos motivos e documentos.";
+  }
+
+  return "";
+}
+
+function recordRawValue(record: StandardizedRecord | null, keys: string[]) {
+  return getRawValue(record, keys) || "";
+}
+
+function recordObject(record: StandardizedRecord | null) {
+  return recordRawValue(record, ["objeto", "descricao", "historico"]);
+}
+
+function recordReference(record: StandardizedRecord | null) {
+  return (
+    recordRawValue(record, ["numero_contrato", "contrato"]) ||
+    recordRawValue(record, ["numero_licitacao", "licitacao"]) ||
+    "Não informado"
+  );
+}
+
 function normalizeLabel(value: unknown) {
   const txt = String(value || "").trim();
   return txt || "Não informado";
@@ -251,25 +336,44 @@ function findMatchingExecutiveInsight(
 
   const supplier = normalizeText(alert.supplier_name);
   const amount = roundMoney(alert.amount);
+  const alertTitle = normalizeText(alert.title);
+  const alertFamily = alertEditorialFamily(alert);
 
   return (
     insights.find((item) => {
+      const title = normalizeText(item.titulo);
       const headline = normalizeText(item.headline);
       const subheadline = normalizeText(item.subheadline);
       const involved = normalizeText(item.envolvido_principal);
+      const insightFamily = insightEditorialFamily(item);
+      const insightAmount = roundMoney(item.valor_principal ?? item.amount);
+
+      const sameTitle =
+        Boolean(alertTitle) &&
+        (alertTitle === title ||
+          alertTitle === headline ||
+          title.includes(alertTitle) ||
+          headline.includes(alertTitle));
+
       const sameSupplier =
-        supplier &&
-        (headline.includes(supplier) ||
+        Boolean(supplier) &&
+        (supplier === involved ||
+          involved.includes(supplier) ||
+          headline.includes(supplier) ||
           subheadline.includes(supplier) ||
           involved.includes(supplier));
+
       const sameAmount =
-        amount > 0 &&
-        (headline.includes(String(amount).replace(".", ",")) ||
-          subheadline.includes(String(amount).replace(".", ",")));
-      return sameSupplier || sameAmount;
-    }) ||
-    insights[0] ||
-    null
+        amount > 0 && insightAmount > 0 && Math.abs(amount - insightAmount) < 1;
+
+      const sameFamily = alertFamily !== "geral" && alertFamily === insightFamily;
+
+      return (
+        sameTitle ||
+        (sameAmount && (sameSupplier || sameFamily)) ||
+        (sameSupplier && sameFamily)
+      );
+    }) || null
   );
 }
 
@@ -340,6 +444,7 @@ export default function AlertDetailPage() {
   const [upload, setUpload] = useState<UploadRecord | null>(null);
   const [analysisLog, setAnalysisLog] = useState<AnalysisLog | null>(null);
   const [records, setRecords] = useState<StandardizedRecord[]>([]);
+  const [alertNumber, setAlertNumber] = useState("");
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -352,6 +457,7 @@ export default function AlertDetailPage() {
   async function fetchRelatedRecords(alertData: AlertRecord) {
     const supplier = normalizeText(alertData.supplier_name);
     const amount = parseAmount(alertData.amount);
+    const family = alertEditorialFamily(alertData);
 
     const recordGroups: StandardizedRecord[][] = [];
 
@@ -422,6 +528,27 @@ export default function AlertDetailPage() {
       recordGroups.push((response.data as StandardizedRecord[]) || []);
     }
 
+    if (family === "inexigibilidade" || family === "dispensa") {
+      const { data, error } = await supabase
+        .from("standardized_records")
+        .select(
+          "id, upload_id, nome_credor_servidor, documento, valor_bruto, raw_json"
+        )
+        .eq("upload_id", alertData.upload_id)
+        .limit(120);
+
+      if (error) throw new Error(error.message);
+
+      const term = family === "inexigibilidade" ? "inexigibilidade" : "dispensa";
+      const modalityRecords = ((data as StandardizedRecord[]) || []).filter(
+        (record) => normalizeText(getRawDict(record).modalidade).includes(term)
+      );
+
+      if (modalityRecords.length > 0) {
+        recordGroups.push(modalityRecords.slice(0, 30));
+      }
+    }
+
     return mergeRecords(recordGroups);
   }
 
@@ -443,7 +570,7 @@ export default function AlertDetailPage() {
 
       const currentAlert = alertData as unknown as AlertRecord;
 
-      const [uploadRes, logsRes] = await Promise.all([
+      const [uploadRes, logsRes, siblingAlertsRes] = await Promise.all([
         supabase
           .from("uploads")
           .select(
@@ -457,17 +584,28 @@ export default function AlertDetailPage() {
           .eq("upload_id", currentAlert.upload_id)
           .order("created_at", { ascending: false })
           .limit(1),
+        supabase
+          .from("alerts")
+          .select("id, upload_id, created_at")
+          .eq("upload_id", currentAlert.upload_id)
+          .order("created_at", { ascending: false }),
       ]);
 
       if (uploadRes.error) throw new Error(uploadRes.error.message);
       if (logsRes.error) throw new Error(logsRes.error.message);
+      if (siblingAlertsRes.error) throw new Error(siblingAlertsRes.error.message);
 
       const relatedRecords = await fetchRelatedRecords(currentAlert);
+      const siblingAlerts = (siblingAlertsRes.data as Array<{ id: string }> | null) || [];
+      const alertIndex = siblingAlerts.findIndex((item) => item.id === currentAlert.id);
 
       setAlert(currentAlert);
       setUpload((uploadRes.data as unknown as UploadRecord) || null);
       setAnalysisLog(((logsRes.data as AnalysisLog[]) || [])[0] || null);
       setRecords(relatedRecords);
+      setAlertNumber(
+        alertIndex >= 0 ? `Alerta ${String(alertIndex + 1).padStart(2, "0")}` : ""
+      );
     } catch (error: unknown) {
       const message =
         error instanceof Error
@@ -503,11 +641,19 @@ export default function AlertDetailPage() {
     ...asRecordArray(aiOutput["insights_executivos"]),
   ];
   const matchedInsight = findMatchingExecutiveInsight(alert, insightsExecutivos);
+  const alertFamily = alertEditorialFamily(alert);
+  const isModalityAlert =
+    alertFamily === "inexigibilidade" || alertFamily === "dispensa";
   const glossarioContextual =
     asRecordArray(aiOutput["explicacoes_contextuais"]).length > 0
       ? asRecordArray(aiOutput["explicacoes_contextuais"])
       : asRecordArray(aiOutput["glossario_contextual"]);
   const blocosExecutivos = recordOrEmpty(aiOutput["blocos_executivos"]);
+  const matchedBlocos = matchedInsight ? blocosExecutivos : {};
+  const matchingGlossary =
+    glossarioContextual.find((item) =>
+      normalizeText(`${item.termo} ${item.explicacao_curta}`).includes(alertFamily)
+    ) || null;
 
   const firstRecord = records[0] || null;
   const rawEntries = rawPreviewEntries(firstRecord);
@@ -542,27 +688,48 @@ export default function AlertDetailPage() {
     textOrEmpty(matchedInsight?.titulo) ||
     textOrEmpty(matchedInsight?.headline) || alert?.title || "Alerta sem título";
   const executiveSubheadline =
-    textOrEmpty(blocosExecutivos["o_que_aconteceu"]) ||
     textOrEmpty(matchedInsight?.subheadline) ||
     textOrEmpty(matchedInsight?.headline) ||
+    textOrEmpty(matchedBlocos["o_que_aconteceu"]) ||
     alert?.explanation ||
     "Este alerta merece leitura porque mantém vínculo com os dados de origem.";
-  const practicalTranslation =
-    textOrEmpty(matchedInsight?.traducao_pratica) ||
-    textOrEmpty(blocosExecutivos["traducao_do_valor"]) ||
-    textOrEmpty(blocosExecutivos["peso_no_arquivo"]) ||
-    (monthlyEstimate > 0
+  const fallbackTranslation = isModalityAlert
+    ? [
+        alertAmount > 0 ? `${formatMoney(alertAmount)} nas linhas ligadas a este alerta.` : "",
+        percentOfUpload > 0 ? `${formatPercent(percentOfUpload)} do total analisado neste upload.` : "",
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : monthlyEstimate > 0
       ? `${formatMoney(monthlyEstimate)} por mês em uma vigência estimada de ${months} meses.`
       : percentOfUpload > 0
         ? `${formatPercent(percentOfUpload)} do total analisado neste upload.`
-        : "");
+        : "";
+  const practicalTranslation =
+    textOrEmpty(matchedInsight?.traducao_pratica) ||
+    textOrEmpty(matchedBlocos["traducao_do_valor"]) ||
+    textOrEmpty(matchedBlocos["peso_no_arquivo"]) ||
+    fallbackTranslation;
   const concernCopy =
     textOrEmpty(matchedInsight?.por_que_preocupa) ||
-    textOrEmpty(blocosExecutivos["por_que_preocupa"]) ||
-    "O dado concentra valor ou padrão relevante e exige explicação antes de qualquer conclusão.";
+    textOrEmpty(matchedBlocos["por_que_preocupa"]) ||
+    (isModalityAlert
+      ? "O alerta não aponta um fornecedor único. Ele mostra uma modalidade recorrente que precisa ser explicada com documentos, justificativas e contexto."
+      : "O dado concentra valor ou padrão relevante e exige explicação antes de qualquer conclusão.");
   const termExplained =
     textOrEmpty(matchedInsight?.termo_explicado) ||
-    textOrEmpty(glossarioContextual[0]?.explicacao_curta);
+    textOrEmpty(matchingGlossary?.explicacao_curta) ||
+    modalityExplanation(alertFamily);
+  const contextualAiCopy =
+    matchedInsight
+      ? displayValue(aiOutput["resumo_contextual_ia"])
+      : alert?.explanation || "Resumo específico indisponível para este alerta.";
+  const interpretiveAiCopy =
+    matchedInsight
+      ? displayValue(aiOutput["resumo_interpretativo"])
+      : matchedAiAlert
+        ? displayValue(matchedAiAlert["explanation"])
+        : "Sem reaproveitar resumo global: este alerta está sendo apresentado apenas com seus próprios dados e registros relacionados.";
 
   if (loading) {
     return (
@@ -608,14 +775,19 @@ export default function AlertDetailPage() {
 
   return (
     <div className="page-shell">
-      <section className="page-header p-6 md:p-8">
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <section className="page-header p-5 md:p-6">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div>
             <Link href="/alerts" className="invest-button-secondary mb-5 w-fit px-4 py-2 text-sm">
               Voltar para alertas
             </Link>
 
             <div className="flex flex-wrap items-center gap-2">
+              {alertNumber && (
+                <span className="app-chip border-[rgba(49,92,255,0.28)] bg-[#f2f5ff] text-[var(--invest-primary)]">
+                  {alertNumber}
+                </span>
+              )}
               <StatusPill tone={severityTone(alert.severity)}>
                 {alert.severity || "baixa"}
               </StatusPill>
@@ -623,22 +795,22 @@ export default function AlertDetailPage() {
               <span className="app-chip">{formatDate(alert.created_at)}</span>
             </div>
 
-            <p className="invest-eyebrow mt-6">O que exige explicação</p>
-            <h1 className="invest-title mt-3 max-w-4xl text-3xl md:text-5xl">
+            <p className="invest-eyebrow mt-5">O que exige explicação</p>
+            <h1 className="invest-title mt-2 max-w-4xl text-2xl md:text-4xl">
               {executiveHeadline}
             </h1>
 
-            <p className="invest-subtitle mt-4 max-w-3xl text-base">
+            <p className="invest-subtitle mt-3 max-w-3xl text-sm">
               {executiveSubheadline}
             </p>
           </div>
 
-          <aside className="rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)]">
+          <aside className="rounded-lg border border-[var(--invest-border)] bg-white p-4 shadow-[var(--invest-shadow-soft)]">
             <p className="invest-eyebrow">Ação</p>
             <h2 className="mt-2 text-lg font-black text-[var(--invest-heading)]">
               Transformar em arte
             </h2>
-            <p className="mt-3 text-sm leading-6 text-[var(--invest-muted)]">
+            <p className="mt-2 text-sm leading-6 text-[var(--invest-muted)]">
               Gere uma peça visual com base apenas neste alerta e na origem
               preservada.
             </p>
@@ -671,7 +843,7 @@ export default function AlertDetailPage() {
         <div className="metric-card">
           <p className="metric-label">Fornecedor</p>
           <p className="mt-3 text-lg font-black text-[var(--invest-heading)]">
-            {alert.supplier_name || "Não informado"}
+            {supplierLabel(alert)}
           </p>
         </div>
         <div className="metric-card">
@@ -685,13 +857,13 @@ export default function AlertDetailPage() {
       </section>
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <article className="evidence-card p-6">
+        <article className="evidence-card p-5">
           <p className="invest-eyebrow">Por que isso preocupa</p>
-          <h2 className="mt-2 text-2xl font-black text-[var(--invest-heading)]">
+          <h2 className="mt-2 text-xl font-black leading-tight text-[var(--invest-heading)]">
             {practicalTranslation ||
               `O valor representa ${formatPercent(percentOfUpload)} do total analisado.`}
           </h2>
-          <div className="mt-5 space-y-3 text-sm leading-7 text-[var(--invest-muted)]">
+          <div className="mt-4 space-y-3 text-sm leading-6 text-[var(--invest-muted)]">
             <p>{concernCopy}</p>
             {termExplained && (
               <p className="rounded-lg border border-orange-200 bg-white p-3 text-orange-950">
@@ -705,7 +877,7 @@ export default function AlertDetailPage() {
           </div>
         </article>
 
-        <aside className="rounded-lg border border-[var(--invest-border)] bg-white p-6 shadow-[var(--invest-shadow-soft)]">
+        <aside className="rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)]">
           <p className="invest-eyebrow">Quanto isso representa</p>
           <div className="mt-5 space-y-4 text-sm">
             <div className="flex items-center justify-between border-b border-[var(--invest-border)] pb-3">
@@ -721,15 +893,29 @@ export default function AlertDetailPage() {
               </span>
             </div>
             <div className="flex items-center justify-between border-b border-[var(--invest-border)] pb-3">
-              <span className="text-[var(--invest-muted)]">Total do fornecedor</span>
+              <span className="text-[var(--invest-muted)]">
+                {isModalityAlert ? "Linhas ligadas ao alerta" : "Total do fornecedor"}
+              </span>
               <span className="invest-number font-black text-[var(--invest-heading)]">
-                {supplierTotal > 0 ? formatMoney(supplierTotal) : "Não encontrado"}
+                {isModalityAlert
+                  ? records.length
+                  : supplierTotal > 0
+                    ? formatMoney(supplierTotal)
+                    : "Não encontrado"}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[var(--invest-muted)]">Peso do fornecedor</span>
+              <span className="text-[var(--invest-muted)]">
+                {isModalityAlert ? "Peso do alerta" : "Peso do fornecedor"}
+              </span>
               <span className="invest-number font-black text-[var(--invest-heading)]">
-                {supplierTotal > 0 ? formatPercent(supplierPercent) : "Não calculado"}
+                {isModalityAlert
+                  ? percentOfUpload > 0
+                    ? formatPercent(percentOfUpload)
+                    : "Não calculado"
+                  : supplierTotal > 0
+                    ? formatPercent(supplierPercent)
+                    : "Não calculado"}
               </span>
             </div>
           </div>
@@ -787,7 +973,7 @@ export default function AlertDetailPage() {
                 O que exige explicação
               </p>
               <p className="mt-3 text-sm leading-7 text-blue-950">
-                {displayValue(aiOutput["resumo_contextual_ia"])}
+                {contextualAiCopy}
               </p>
             </div>
 
@@ -796,7 +982,7 @@ export default function AlertDetailPage() {
                 Síntese sem repetir os números
               </p>
               <p className="mt-3 text-sm leading-7 text-[var(--invest-muted)]">
-                {displayValue(aiOutput["resumo_interpretativo"])}
+                {interpretiveAiCopy}
               </p>
             </div>
           </div>
@@ -841,29 +1027,36 @@ export default function AlertDetailPage() {
               <strong className="text-[var(--invest-heading)]">Registros candidatos encontrados:</strong>{" "}
               {records.length}
             </p>
-            {textOrEmpty(blocosExecutivos["proxima_pergunta"]) && (
+            {textOrEmpty(matchedBlocos["proxima_pergunta"]) && (
               <p>
                 <strong className="text-[var(--invest-heading)]">Pergunta que fica:</strong>{" "}
-                {textOrEmpty(blocosExecutivos["proxima_pergunta"])}
+                {textOrEmpty(matchedBlocos["proxima_pergunta"])}
               </p>
             )}
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-[var(--invest-border)] bg-white shadow-[var(--invest-shadow-soft)]">
+        <div className="overflow-hidden rounded-lg border border-[var(--invest-border)] bg-white shadow-[var(--invest-shadow-soft)] xl:col-span-2">
           <div className="border-b border-[var(--invest-border)] p-5">
             <p className="invest-eyebrow">Registros</p>
             <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">
-              Linhas relacionadas
+              Itens ligados a este alerta
             </h2>
+            <p className="mt-2 text-sm text-[var(--invest-muted)]">
+              Estes são os registros encontrados para este alerta específico.
+              Em alertas por modalidade, a lista prioriza as linhas da própria modalidade.
+            </p>
           </div>
 
           <div className="invest-soft-scroll overflow-x-auto">
-            <table className="data-table">
+            <table className="data-table min-w-[1080px]">
               <thead>
                 <tr>
                   <th>Fornecedor / nome</th>
-                  <th>Documento</th>
+                  <th>Objeto</th>
+                  <th>Modalidade</th>
+                  <th>Tipo</th>
+                  <th>Número</th>
                   <th className="text-right">Valor</th>
                 </tr>
               </thead>
@@ -871,8 +1064,18 @@ export default function AlertDetailPage() {
               <tbody>
                 {records.map((record) => (
                   <tr key={record.id}>
-                    <td>{normalizeLabel(record.nome_credor_servidor)}</td>
-                    <td>{normalizeLabel(record.documento)}</td>
+                    <td className="font-bold text-[var(--invest-heading)]">
+                      {normalizeLabel(record.nome_credor_servidor)}
+                      <p className="mt-1 text-xs font-semibold text-[var(--invest-muted)]">
+                        {normalizeLabel(record.documento)}
+                      </p>
+                    </td>
+                    <td className="max-w-[320px] text-sm leading-5">
+                      {normalizeLabel(recordObject(record))}
+                    </td>
+                    <td>{normalizeLabel(recordRawValue(record, ["modalidade"]))}</td>
+                    <td>{normalizeLabel(recordRawValue(record, ["tipo_ato", "tipo"]))}</td>
+                    <td>{recordReference(record)}</td>
                     <td className="text-right invest-number font-bold">
                       {formatMoney(parseAmount(record.valor_bruto))}
                     </td>
@@ -881,7 +1084,7 @@ export default function AlertDetailPage() {
 
                 {records.length === 0 && (
                   <tr>
-                    <td colSpan={3}>Nenhum registro relacionado encontrado.</td>
+                    <td colSpan={6}>Nenhum registro relacionado encontrado.</td>
                   </tr>
                 )}
               </tbody>

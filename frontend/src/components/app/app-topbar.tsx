@@ -12,6 +12,10 @@ const pageMeta: Record<string, { title: string; note: string }> = {
     title: "Enviar arquivo",
     note: "Importe dados com categoria clara.",
   },
+  records: {
+    title: "Linhas",
+    note: "Consulte os registros carregados e seus vínculos com alertas.",
+  },
   alerts: {
     title: "Alertas",
     note: "Filtre sinais que exigem explicação.",
