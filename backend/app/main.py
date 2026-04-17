@@ -835,6 +835,14 @@ async def analyze_upload(upload_id: str):
         def clean(value, limit=240):
             return str(value or "").strip()[:limit]
 
+        def optional_number(value):
+            if value in [None, ""]:
+                return None
+            if isinstance(value, str):
+                value = value.replace("%", "").strip()
+            number = safe_parse_amount(value)
+            return number if number > 0 else None
+
         if text.startswith("```"):
             text = re.sub(r"^```(?:json)?\s*", "", text)
             text = re.sub(r"\s*```$", "", text)
@@ -923,6 +931,13 @@ async def analyze_upload(upload_id: str):
                 160,
             ),
             "gravidade_editorial": clean(principal_source.get("gravidade_editorial"), 40),
+            "valor_principal": optional_number(
+                principal_source.get("valor_principal") or principal_source.get("amount")
+            ),
+            "peso_percentual": optional_number(principal_source.get("peso_percentual")),
+            "custo_mensal_estimado": optional_number(
+                principal_source.get("custo_mensal_estimado")
+            ),
         }
 
         if not parsed["insights_executivos"] and parsed["insight_principal"]["headline"]:
@@ -1186,6 +1201,61 @@ async def analyze_upload(upload_id: str):
         seen_alert_keys.add(key)
         alertas_insert.append(alert)
 
+    def severity_from_editorial(value):
+        text = normalize_text(value)
+        if "alta" in text:
+            return "alta"
+        if "media" in text or "média" in text:
+            return "media"
+        if "baixa" in text:
+            return "baixa"
+        return "media"
+
+    def build_insight_alert():
+        insight = ai_json.get("insight_principal")
+        if not isinstance(insight, dict):
+            return None
+
+        title = str(
+            insight.get("titulo")
+            or insight.get("headline")
+            or ""
+        ).strip()
+        headline = str(insight.get("headline") or "").strip()
+
+        if not title and not headline:
+            return None
+
+        explanation_parts = []
+        seen_parts = set()
+        for value in [
+            headline if normalize_text(headline) != normalize_text(title) else "",
+            insight.get("traducao_pratica"),
+            insight.get("por_que_preocupa"),
+        ]:
+            text = str(value or "").strip()
+            normalized = normalize_text(text)
+            if text and normalized not in seen_parts:
+                seen_parts.add(normalized)
+                explanation_parts.append(text)
+
+        explanation = " ".join(explanation_parts) or headline or title
+        amount = safe_parse_amount(insight.get("valor_principal"))
+        supplier = str(insight.get("envolvido_principal") or "").strip()
+
+        return {
+            "upload_id": upload_id,
+            "city_id": upload_record["city_id"],
+            "category": upload_record.get("category"),
+            "report_type": upload_record.get("report_type"),
+            "report_label": upload_record.get("report_label"),
+            "title": title[:255],
+            "explanation": explanation,
+            "severity": severity_from_editorial(insight.get("gravidade_editorial")),
+            "amount": amount,
+            "supplier_name": supplier[:255],
+        }
+
     analysis_started = False
 
     try:
@@ -1357,6 +1427,9 @@ async def analyze_upload(upload_id: str):
                 "por_que_preocupa": "",
                 "envolvido_principal": "",
                 "gravidade_editorial": "",
+                "valor_principal": None,
+                "peso_percentual": None,
+                "custo_mensal_estimado": None,
             },
             "explicacoes_contextuais": [],
             "blocos_executivos": {
@@ -1434,6 +1507,10 @@ Como construir insight_principal:
 - O campo por_que_preocupa deve explicar por que isso merece apuração, sem afirmar crime.
 - Não diga "município pequeno" se o porte municipal não estiver no contexto. Nesse caso, diga que exige explicação pela dimensão do gasto e pela concentração.
 
+- valor_principal deve ser numero puro, sem "R$", sem texto e sem escala por extenso.
+- peso_percentual deve ser numero puro, sem "%".
+- custo_mensal_estimado deve ser numero puro, sem "R$", quando houver vigencia suficiente.
+
 Como construir blocos_executivos:
 - o_que_aconteceu: uma frase factual.
 - quanto_custa: valor principal, se houver.
@@ -1471,7 +1548,10 @@ RESPONDA APENAS EM JSON VÁLIDO NESTA ESTRUTURA:
     "traducao_pratica": "Cerca de R$ 627,7 mil por mês durante 12 meses.",
     "por_que_preocupa": "Esse valor exige explicação pela dimensão do gasto e pela concentração em um único fornecedor.",
     "envolvido_principal": "Distribuidora Completa",
-    "gravidade_editorial": "alta"
+    "gravidade_editorial": "alta",
+    "valor_principal": 7532410.0,
+    "peso_percentual": 82.9,
+    "custo_mensal_estimado": 627700.0
   }},
   "explicacoes_contextuais": [
     {{
@@ -1517,6 +1597,9 @@ RESPONDA APENAS EM JSON VÁLIDO NESTA ESTRUTURA:
                         "por_que_preocupa": "",
                         "envolvido_principal": "",
                         "gravidade_editorial": "",
+                        "valor_principal": None,
+                        "peso_percentual": None,
+                        "custo_mensal_estimado": None,
                     },
                     "explicacoes_contextuais": [],
                     "blocos_executivos": {
@@ -1665,7 +1748,12 @@ RESPONDA APENAS EM JSON VÁLIDO NESTA ESTRUTURA:
                     "supplier_name": fornecedor
                 })
 
-        # 8. Alertas da IA
+        # 8. Insight principal da IA como alerta real
+        insight_alert = build_insight_alert()
+        if insight_alert:
+            add_alert(insight_alert)
+
+        # 9. Alertas da IA
         if ai_json.get("alertas") and isinstance(ai_json["alertas"], list):
             for alert in ai_json["alertas"]:
                 if not isinstance(alert, dict):
@@ -1681,13 +1769,13 @@ RESPONDA APENAS EM JSON VÁLIDO NESTA ESTRUTURA:
                     "explanation": str(alert.get("explanation", "")),
                     "severity": str(alert.get("severity", "baixa"))[:20],
                     "amount": safe_parse_amount(alert.get("amount", 0)),
-                    "supplier_name": str(alert.get("supplier_name", ""))[:255]
+                    "supplier_name": str(alert.get("supplier_name") or "")[:255]
                 })
 
         if alertas_insert:
             supabase.table("alerts").insert(alertas_insert).execute()
 
-        # 9. Finalizar
+        # 10. Finalizar
         supabase.table("uploads").update({
             "analysis_status": "analyzed"
         }).eq("id", upload_id).execute()

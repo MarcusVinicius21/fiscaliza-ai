@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  CSSProperties,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { StatusPill } from "@/components/app/status-pill";
 import { SkeletonBlock } from "@/components/app/skeleton-block";
 import { supabase } from "@/lib/supabase";
@@ -146,22 +153,81 @@ function formatDate(value?: string | null) {
   return date.toLocaleDateString("pt-BR");
 }
 
-function InfoHint({
-  text,
-  align = "right",
-}: {
-  text: string;
-  align?: "left" | "center" | "right";
-}) {
-  const alignClass =
-    align === "left"
-      ? "left-0"
-      : align === "center"
-        ? "left-1/2 -translate-x-1/2"
-        : "right-0";
+function InfoHint({ text }: { text: string }) {
+  const wrapperRef = useRef<HTMLSpanElement | null>(null);
+  const tooltipRef = useRef<HTMLSpanElement | null>(null);
+  const [open, setOpen] = useState(false);
+  const [style, setStyle] = useState<CSSProperties>({
+    visibility: "hidden",
+    left: 0,
+    top: 0,
+  });
+
+  const position = useCallback(() => {
+    const wrapper = wrapperRef.current;
+    const tooltip = tooltipRef.current;
+    if (!wrapper || !tooltip) return;
+
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const margin = 12;
+    const gap = 10;
+
+    const trigger = wrapper.getBoundingClientRect();
+
+    // Largura desejada: até 288px, mas limitada pela viewport.
+    const maxWidth = Math.min(288, viewportWidth - margin * 2);
+    tooltip.style.width = `${maxWidth}px`;
+
+    const tipRect = tooltip.getBoundingClientRect();
+    const tipHeight = tipRect.height || 96;
+
+    // Horizontal: centra no trigger; corrige se vazar qualquer borda.
+    let left = trigger.left + trigger.width / 2 - maxWidth / 2;
+    if (left < margin) left = margin;
+    if (left + maxWidth > viewportWidth - margin) {
+      left = viewportWidth - margin - maxWidth;
+    }
+
+    // Vertical: abaixo por padrão; se não couber, vai para cima.
+    const spaceBelow = viewportHeight - trigger.bottom;
+    const placeAbove = spaceBelow < tipHeight + gap && trigger.top > tipHeight + gap;
+    const top = placeAbove
+      ? trigger.top - tipHeight - gap
+      : trigger.bottom + gap;
+
+    setStyle({
+      position: "fixed",
+      left,
+      top,
+      width: maxWidth,
+      visibility: "visible",
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    position();
+
+    const handle = () => position();
+    window.addEventListener("resize", handle);
+    window.addEventListener("scroll", handle, true);
+    return () => {
+      window.removeEventListener("resize", handle);
+      window.removeEventListener("scroll", handle, true);
+    };
+  }, [open, position]);
 
   return (
-    <span className="group relative inline-flex align-middle">
+    <span
+      ref={wrapperRef}
+      className="relative inline-flex align-middle"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+    >
       <button
         type="button"
         aria-label={text}
@@ -169,11 +235,16 @@ function InfoHint({
       >
         i
       </button>
-      <span
-        className={`pointer-events-none absolute top-9 z-40 hidden w-64 max-w-[calc(100vw-2rem)] rounded-lg border border-[var(--invest-border)] bg-white p-2.5 text-left text-xs font-semibold leading-5 text-[var(--invest-muted)] shadow-[0_16px_36px_rgba(15,23,42,0.12)] group-hover:block group-focus-within:block ${alignClass}`}
-      >
-        {text}
-      </span>
+      {open && (
+        <span
+          ref={tooltipRef}
+          role="tooltip"
+          style={style}
+          className="pointer-events-none z-50 rounded-lg border border-[var(--invest-border)] bg-white p-3 text-left text-xs font-semibold leading-5 text-[var(--invest-muted)] shadow-[0_16px_36px_rgba(15,23,42,0.12)]"
+        >
+          {text}
+        </span>
+      )}
     </span>
   );
 }
@@ -511,7 +582,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div>
             <p className="invest-eyebrow">Painel principal</p>
-            <h1 className="invest-title mt-2 max-w-3xl text-2xl md:text-4xl">
+            <h1 className="invest-title mt-2 max-w-3xl text-xl leading-tight md:text-[2rem]">
               O que exige explicação agora.
             </h1>
             <p className="invest-subtitle mt-3 max-w-2xl text-sm">

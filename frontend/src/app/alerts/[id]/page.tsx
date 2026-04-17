@@ -337,42 +337,27 @@ function findMatchingExecutiveInsight(
   const supplier = normalizeText(alert.supplier_name);
   const amount = roundMoney(alert.amount);
   const alertTitle = normalizeText(alert.title);
-  const alertFamily = alertEditorialFamily(alert);
 
   return (
     insights.find((item) => {
       const title = normalizeText(item.titulo);
       const headline = normalizeText(item.headline);
-      const subheadline = normalizeText(item.subheadline);
       const involved = normalizeText(item.envolvido_principal);
-      const insightFamily = insightEditorialFamily(item);
       const insightAmount = roundMoney(item.valor_principal ?? item.amount);
 
-      const sameTitle =
+      // Identidade estrita 1: título idêntico ao titulo/headline do insight.
+      const exactTitle =
         Boolean(alertTitle) &&
-        (alertTitle === title ||
-          alertTitle === headline ||
-          title.includes(alertTitle) ||
-          headline.includes(alertTitle));
+        (alertTitle === title || alertTitle === headline);
 
-      const sameSupplier =
-        Boolean(supplier) &&
-        (supplier === involved ||
-          involved.includes(supplier) ||
-          headline.includes(supplier) ||
-          subheadline.includes(supplier) ||
-          involved.includes(supplier));
+      // Identidade estrita 2: fornecedor + valor coincidindo (ambos obrigatórios e não vazios).
+      const exactSupplier = Boolean(supplier) && supplier === involved;
+      const exactAmount =
+        amount > 0 &&
+        insightAmount > 0 &&
+        Math.abs(amount - insightAmount) < 1;
 
-      const sameAmount =
-        amount > 0 && insightAmount > 0 && Math.abs(amount - insightAmount) < 1;
-
-      const sameFamily = alertFamily !== "geral" && alertFamily === insightFamily;
-
-      return (
-        sameTitle ||
-        (sameAmount && (sameSupplier || sameFamily)) ||
-        (sameSupplier && sameFamily)
-      );
+      return exactTitle || (exactSupplier && exactAmount);
     }) || null
   );
 }
@@ -720,16 +705,23 @@ export default function AlertDetailPage() {
     textOrEmpty(matchedInsight?.termo_explicado) ||
     textOrEmpty(matchingGlossary?.explicacao_curta) ||
     modalityExplanation(alertFamily);
+  // Nunca reaproveitar resumo_contextual_ia/resumo_interpretativo do upload:
+  // esses campos descrevem o arquivo inteiro e contaminariam alertas secundários
+  // com a narrativa do alerta mais saliente. Só usamos texto vinculado ao alerta.
   const contextualAiCopy =
-    matchedInsight
-      ? displayValue(aiOutput["resumo_contextual_ia"])
-      : alert?.explanation || "Resumo específico indisponível para este alerta.";
+    textOrEmpty(matchedAiAlert?.["explanation"]) ||
+    textOrEmpty(matchedInsight?.resumo_contextual) ||
+    textOrEmpty(matchedInsight?.contexto) ||
+    textOrEmpty(matchedInsight?.subheadline) ||
+    alert?.explanation ||
+    "Resumo específico indisponível para este alerta.";
   const interpretiveAiCopy =
-    matchedInsight
-      ? displayValue(aiOutput["resumo_interpretativo"])
-      : matchedAiAlert
-        ? displayValue(matchedAiAlert["explanation"])
-        : "Sem reaproveitar resumo global: este alerta está sendo apresentado apenas com seus próprios dados e registros relacionados.";
+    textOrEmpty(matchedInsight?.interpretacao) ||
+    textOrEmpty(matchedInsight?.leitura) ||
+    textOrEmpty(matchedInsight?.por_que_preocupa) ||
+    textOrEmpty(matchedBlocos["leitura_editorial"]) ||
+    textOrEmpty(matchedBlocos["por_que_preocupa"]) ||
+    "Este alerta é apresentado apenas com seus próprios dados e registros relacionados.";
 
   if (loading) {
     return (
@@ -796,7 +788,7 @@ export default function AlertDetailPage() {
             </div>
 
             <p className="invest-eyebrow mt-5">O que exige explicação</p>
-            <h1 className="invest-title mt-2 max-w-4xl text-2xl md:text-4xl">
+            <h1 className="invest-title mt-2 max-w-3xl text-xl leading-tight md:text-[1.875rem]">
               {executiveHeadline}
             </h1>
 

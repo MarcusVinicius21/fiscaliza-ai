@@ -420,7 +420,7 @@ export default function RecordsPage() {
     <div className="page-shell">
       <section className="page-header p-5 md:p-6">
         <p className="invest-eyebrow">Base carregada</p>
-        <h1 className="invest-title mt-2 max-w-3xl text-2xl md:text-4xl">
+        <h1 className="invest-title mt-2 max-w-3xl text-xl leading-tight md:text-[1.875rem]">
           Linhas do arquivo, com vínculos de alerta.
         </h1>
         <p className="invest-subtitle mt-3 max-w-2xl text-sm">

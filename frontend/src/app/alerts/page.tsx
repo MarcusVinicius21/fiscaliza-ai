@@ -369,10 +369,10 @@ export default function AlertsPage() {
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_440px]">
           <div>
             <p className="invest-eyebrow">Fila de alertas</p>
-            <h1 className="invest-title mt-3 max-w-4xl text-3xl md:text-5xl">
+            <h1 className="invest-title mt-2 max-w-3xl text-xl leading-tight md:text-[2rem]">
               Alertas que merecem apuração
             </h1>
-            <p className="invest-subtitle mt-4 max-w-3xl text-base">
+            <p className="invest-subtitle mt-3 max-w-3xl text-sm">
               Comece pelos maiores valores e pelos fornecedores mais citados.
               Cada alerta mantém vínculo com o arquivo original.
             </p>
