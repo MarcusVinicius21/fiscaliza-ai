@@ -4,6 +4,8 @@
   --invest-bg: #f5f7fb;
   --invest-bg-soft: #eef2f8;
   --invest-surface: #ffffff;
+  --invest-surface-soft: #f8fafc;
+  --invest-surface-elevated: #ffffff;
   --invest-surface-raised: #ffffff;
   --invest-card: #ffffff;
   --invest-card-soft: #f8fafc;
@@ -20,9 +22,67 @@
   --invest-danger: #e63946;
   --invest-warning: #f97316;
   --invest-success: #12a980;
+  --invest-input-bg: #ffffff;
+  --invest-input-text: #070b18;
+  --invest-input-border: #d8deea;
+  --invest-placeholder: #98a2b3;
+  --invest-table-head: #f8fafc;
+  --invest-table-hover: #f8fbff;
+  --invest-tooltip-bg: #ffffff;
+  --invest-tooltip-text: #667085;
+  --invest-chip-bg: #ffffff;
+  --invest-chip-text: #344054;
+  --invest-focus-ring: rgba(49, 92, 255, 0.12);
+  --invest-selection-bg: rgba(49, 92, 255, 0.18);
+  --invest-page-gradient:
+    radial-gradient(circle at 8% 4%, rgba(49, 92, 255, 0.08), transparent 28%),
+    radial-gradient(circle at 84% 0%, rgba(18, 184, 166, 0.08), transparent 26%),
+    linear-gradient(180deg, #f7f9fd 0%, #f2f5fa 46%, #eef2f8 100%);
   --invest-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
   --invest-shadow-soft: 0 10px 26px rgba(15, 23, 42, 0.06);
   --invest-radius: 8px;
+}
+
+html[data-theme="dark"] {
+  --invest-bg: #212121;
+  --invest-bg-soft: #262626;
+  --invest-surface: #2a2a2a;
+  --invest-surface-soft: #303030;
+  --invest-surface-elevated: #343434;
+  --invest-surface-raised: #343434;
+  --invest-card: #2a2a2a;
+  --invest-card-soft: #303030;
+  --invest-border: #3d3d3d;
+  --invest-border-strong: #515151;
+  --invest-text: #ededed;
+  --invest-heading: #f9f9f9;
+  --invest-muted: #bdbdbd;
+  --invest-faint: #8f8f8f;
+  --invest-primary: #7aa2ff;
+  --invest-primary-strong: #a9c2ff;
+  --invest-info: #8ecbff;
+  --invest-cyan: #68d9cb;
+  --invest-danger: #ff7a86;
+  --invest-warning: #ffb36b;
+  --invest-success: #70ddb9;
+  --invest-input-bg: #2b2b2b;
+  --invest-input-text: #f9f9f9;
+  --invest-input-border: #555555;
+  --invest-placeholder: #9c9c9c;
+  --invest-table-head: #2f2f2f;
+  --invest-table-hover: #323232;
+  --invest-tooltip-bg: #303030;
+  --invest-tooltip-text: #f9f9f9;
+  --invest-chip-bg: #303030;
+  --invest-chip-text: #e7e7e7;
+  --invest-focus-ring: rgba(122, 162, 255, 0.28);
+  --invest-selection-bg: rgba(122, 162, 255, 0.28);
+  --invest-page-gradient:
+    radial-gradient(circle at 8% 4%, rgba(122, 162, 255, 0.08), transparent 30%),
+    radial-gradient(circle at 84% 0%, rgba(104, 217, 203, 0.06), transparent 28%),
+    linear-gradient(180deg, #212121 0%, #242424 46%, #212121 100%);
+  --invest-shadow: 0 22px 48px rgba(0, 0, 0, 0.34);
+  --invest-shadow-soft: 0 12px 28px rgba(0, 0, 0, 0.24);
 }
 
 * {
@@ -35,13 +95,14 @@ html {
   color-scheme: light;
 }
 
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
 body {
   margin: 0;
   min-height: 100%;
-  background:
-    radial-gradient(circle at 8% 4%, rgba(49, 92, 255, 0.08), transparent 28%),
-    radial-gradient(circle at 84% 0%, rgba(18, 184, 166, 0.08), transparent 26%),
-    linear-gradient(180deg, #f7f9fd 0%, #f2f5fa 46%, #eef2f8 100%);
+  background: var(--invest-page-gradient);
   color: var(--invest-text);
   text-rendering: geometricPrecision;
 }
@@ -67,7 +128,7 @@ a[href] {
 }
 
 ::selection {
-  background: rgba(49, 92, 255, 0.18);
+  background: var(--invest-selection-bg);
   color: var(--invest-heading);
 }
 
@@ -110,7 +171,7 @@ a[href] {
   border-radius: var(--invest-radius);
   background:
     linear-gradient(135deg, rgba(49, 92, 255, 0.08), transparent 42%),
-    linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+    linear-gradient(180deg, var(--invest-surface) 0%, var(--invest-surface-soft) 100%);
   box-shadow: var(--invest-shadow-soft);
 }
 
@@ -168,8 +229,8 @@ a[href] {
   border: 1px solid rgba(49, 92, 255, 0.22);
   border-radius: var(--invest-radius);
   background:
-    linear-gradient(135deg, rgba(49, 92, 255, 0.09), rgba(255, 255, 255, 0.96) 46%),
-    #ffffff;
+    linear-gradient(135deg, rgba(49, 92, 255, 0.09), color-mix(in srgb, var(--invest-surface) 92%, transparent) 46%),
+    var(--invest-surface);
   box-shadow: var(--invest-shadow);
 }
 
@@ -177,7 +238,7 @@ a[href] {
   border: 1px solid rgba(249, 115, 22, 0.22);
   border-left: 4px solid var(--invest-warning);
   border-radius: var(--invest-radius);
-  background: #fffaf5;
+  background: color-mix(in srgb, var(--invest-warning) 8%, var(--invest-surface));
 }
 
 .invest-section-title {
@@ -243,10 +304,10 @@ a[href] {
 .fiscaliza-shell textarea {
   min-height: 44px;
   width: 100%;
-  border: 1px solid #d8deea;
+  border: 1px solid var(--invest-input-border);
   border-radius: var(--invest-radius);
-  background: #ffffff;
-  color: var(--invest-heading);
+  background: var(--invest-input-bg);
+  color: var(--invest-input-text);
   outline: none;
   transition:
     border-color 180ms ease,
@@ -266,9 +327,9 @@ a[href] {
 .fiscaliza-shell input[type="file"] {
   width: 100%;
   min-height: 44px;
-  border: 1px dashed #c7d2e4;
+  border: 1px dashed var(--invest-input-border);
   border-radius: var(--invest-radius);
-  background: #ffffff;
+  background: var(--invest-input-bg);
   color: var(--invest-muted);
   padding: 0.65rem;
 }
@@ -277,7 +338,7 @@ a[href] {
 .invest-textarea::placeholder,
 .fiscaliza-shell input::placeholder,
 .fiscaliza-shell textarea::placeholder {
-  color: #98a2b3;
+  color: var(--invest-placeholder);
 }
 
 .invest-input:focus,
@@ -287,12 +348,12 @@ a[href] {
 .fiscaliza-shell select:focus,
 .fiscaliza-shell textarea:focus {
   border-color: rgba(49, 92, 255, 0.72);
-  background: #ffffff;
-  box-shadow: 0 0 0 4px rgba(49, 92, 255, 0.12);
+  background: var(--invest-input-bg);
+  box-shadow: 0 0 0 4px var(--invest-focus-ring);
 }
 
 .fiscaliza-shell option {
-  background: #ffffff;
+  background: var(--invest-input-bg);
   color: var(--invest-heading);
 }
 
@@ -351,9 +412,9 @@ a[href] {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  border: 1px solid #d8deea;
+  border: 1px solid var(--invest-border);
   border-radius: var(--invest-radius);
-  background: #ffffff;
+  background: var(--invest-surface);
   color: var(--invest-primary);
   font-weight: 750;
   transition:
@@ -366,7 +427,7 @@ a[href] {
 .invest-button-secondary:hover,
 .button-secondary:hover {
   border-color: rgba(49, 92, 255, 0.42);
-  background: #f5f7ff;
+  background: var(--invest-surface-soft);
   transform: translateY(-1px);
   box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
 }
@@ -381,7 +442,7 @@ a[href] {
 
 .invest-table thead,
 .data-table thead {
-  background: #f8fafc;
+  background: var(--invest-table-head);
 }
 
 .invest-table th,
@@ -410,7 +471,7 @@ a[href] {
 
 .invest-table tbody tr:hover,
 .data-table tbody tr:hover {
-  background: #f8fbff;
+  background: var(--invest-table-hover);
 }
 
 .invest-chip,
@@ -420,10 +481,10 @@ a[href] {
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  border: 1px solid #d8deea;
+  border: 1px solid var(--invest-border);
   border-radius: 999px;
-  background: #ffffff;
-  color: #344054;
+  background: var(--invest-chip-bg);
+  color: var(--invest-chip-text);
   padding: 0.25rem 0.65rem;
   font-size: 0.76rem;
   font-weight: 750;
@@ -436,7 +497,157 @@ a[href] {
 
 .invest-evidence {
   border-left: 4px solid var(--invest-primary);
-  background: #f5f7ff;
+  background: color-mix(in srgb, var(--invest-primary) 10%, var(--invest-surface));
+}
+
+.status-pill-info {
+  border-color: color-mix(in srgb, var(--invest-info) 36%, transparent);
+  background: color-mix(in srgb, var(--invest-info) 12%, var(--invest-surface));
+  color: var(--invest-info-strong);
+}
+
+.status-pill-success {
+  border-color: color-mix(in srgb, var(--invest-success) 36%, transparent);
+  background: color-mix(in srgb, var(--invest-success) 12%, var(--invest-surface));
+  color: var(--invest-success);
+}
+
+.status-pill-warning {
+  border-color: color-mix(in srgb, var(--invest-warning) 40%, transparent);
+  background: color-mix(in srgb, var(--invest-warning) 14%, var(--invest-surface));
+  color: var(--invest-warning);
+}
+
+.status-pill-danger {
+  border-color: color-mix(in srgb, var(--invest-danger) 36%, transparent);
+  background: color-mix(in srgb, var(--invest-danger) 12%, var(--invest-surface));
+  color: var(--invest-danger);
+}
+
+.status-pill-muted {
+  border-color: var(--invest-border);
+  background: var(--invest-chip-bg);
+  color: var(--invest-chip-text);
+}
+
+.skeleton-line {
+  background: linear-gradient(
+    90deg,
+    var(--invest-surface-soft),
+    var(--invest-surface-elevated),
+    var(--invest-surface-soft)
+  );
+  background-size: 220% 100%;
+}
+
+.invest-input:-webkit-autofill,
+.invest-input:-webkit-autofill:hover,
+.invest-input:-webkit-autofill:focus,
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--invest-input-text);
+  box-shadow: 0 0 0 1000px var(--invest-input-bg) inset;
+  caret-color: var(--invest-input-text);
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+html[data-theme="dark"] .fiscaliza-shell {
+  background: var(--invest-bg);
+}
+
+html[data-theme="dark"] .bg-white,
+html[data-theme="dark"] [class~="bg-[#ffffff]"] {
+  background-color: var(--invest-surface) !important;
+}
+
+html[data-theme="dark"] [class*="bg-white/"] {
+  background-color: color-mix(in srgb, var(--invest-surface) 92%, transparent) !important;
+}
+
+html[data-theme="dark"] .bg-gray-50,
+html[data-theme="dark"] .bg-gray-100,
+html[data-theme="dark"] .bg-slate-50,
+html[data-theme="dark"] .bg-slate-100,
+html[data-theme="dark"] [class~="bg-[#fbfcff]"],
+html[data-theme="dark"] [class~="bg-[#f8fafc]"],
+html[data-theme="dark"] [class~="bg-[#eef2f8]"],
+html[data-theme="dark"] [class~="bg-[#f2f5ff]"] {
+  background-color: var(--invest-surface-soft) !important;
+}
+
+html[data-theme="dark"] .bg-blue-50 {
+  background-color: color-mix(in srgb, var(--invest-info) 14%, var(--invest-surface)) !important;
+}
+
+html[data-theme="dark"] .bg-orange-50,
+html[data-theme="dark"] .bg-yellow-50 {
+  background-color: color-mix(in srgb, var(--invest-warning) 14%, var(--invest-surface)) !important;
+}
+
+html[data-theme="dark"] .bg-red-50 {
+  background-color: color-mix(in srgb, var(--invest-danger) 14%, var(--invest-surface)) !important;
+}
+
+html[data-theme="dark"] .bg-emerald-50 {
+  background-color: color-mix(in srgb, var(--invest-success) 13%, var(--invest-surface)) !important;
+}
+
+html[data-theme="dark"] .text-gray-950,
+html[data-theme="dark"] .text-gray-900,
+html[data-theme="dark"] .text-slate-950,
+html[data-theme="dark"] .text-slate-900,
+html[data-theme="dark"] .text-blue-950,
+html[data-theme="dark"] .text-orange-950,
+html[data-theme="dark"] .text-red-950 {
+  color: var(--invest-heading) !important;
+}
+
+html[data-theme="dark"] .text-gray-800,
+html[data-theme="dark"] .text-gray-700,
+html[data-theme="dark"] .text-slate-800,
+html[data-theme="dark"] .text-slate-700,
+html[data-theme="dark"] .text-blue-700,
+html[data-theme="dark"] .text-orange-700,
+html[data-theme="dark"] .text-red-700,
+html[data-theme="dark"] .text-yellow-700,
+html[data-theme="dark"] .text-emerald-700 {
+  color: var(--invest-text) !important;
+}
+
+html[data-theme="dark"] .text-gray-600,
+html[data-theme="dark"] .text-gray-500,
+html[data-theme="dark"] .text-slate-600,
+html[data-theme="dark"] .text-slate-500 {
+  color: var(--invest-muted) !important;
+}
+
+html[data-theme="dark"] .border-gray-100,
+html[data-theme="dark"] .border-gray-200,
+html[data-theme="dark"] .border-slate-100,
+html[data-theme="dark"] .border-slate-200,
+html[data-theme="dark"] .border-blue-100,
+html[data-theme="dark"] .border-blue-200,
+html[data-theme="dark"] .border-orange-200,
+html[data-theme="dark"] .border-yellow-200,
+html[data-theme="dark"] .border-red-200,
+html[data-theme="dark"] .border-emerald-200 {
+  border-color: var(--invest-border) !important;
+}
+
+html[data-theme="dark"] .focus\:ring-blue-100:focus,
+html[data-theme="dark"] .focus\:ring-blue-200:focus {
+  --tw-ring-color: var(--invest-focus-ring) !important;
+}
+
+html[data-theme="dark"] .invest-soft-scroll::-webkit-scrollbar-thumb {
+  background: rgba(249, 249, 249, 0.22);
 }
 
 @media (prefers-reduced-motion: reduce) {

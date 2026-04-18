@@ -39,7 +39,7 @@ export function AppSidebar() {
         width: collapsed ? 0 : 268,
         transition: "width 300ms cubic-bezier(0.4, 0, 0.2, 1)",
       }}
-      className="hidden shrink-0 overflow-hidden min-h-dvh border-r border-[var(--invest-border)] bg-white shadow-[16px_0_32px_rgba(15,23,42,0.04)] lg:flex lg:flex-col"
+      className="hidden shrink-0 overflow-hidden min-h-dvh border-r border-[var(--invest-border)] bg-[var(--invest-surface)] shadow-[var(--invest-shadow-soft)] lg:flex lg:flex-col"
     >
       {/* Inner wrapper fades out slightly faster than the width closes */}
       <div
@@ -84,8 +84,8 @@ export function AppSidebar() {
                       className={[
                         "group grid grid-cols-[34px_minmax(0,1fr)] items-center gap-3 rounded-lg border px-3 py-2.5 transition duration-200",
                         active
-                          ? "border-[rgba(49,92,255,0.28)] bg-[#f2f5ff] text-[var(--invest-heading)] shadow-[0_10px_22px_rgba(49,92,255,0.08)]"
-                          : "border-transparent text-[var(--invest-muted)] hover:border-[var(--invest-border)] hover:bg-[#f8fafc]",
+                          ? "border-[rgba(49,92,255,0.34)] bg-[var(--invest-surface-soft)] text-[var(--invest-heading)] shadow-[0_10px_22px_rgba(49,92,255,0.08)]"
+                          : "border-transparent text-[var(--invest-muted)] hover:border-[var(--invest-border)] hover:bg-[var(--invest-surface-soft)]",
                       ].join(" ")}
                     >
                       <span
@@ -93,7 +93,7 @@ export function AppSidebar() {
                           "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-black",
                           active
                             ? "bg-[var(--invest-primary)] text-white"
-                            : "bg-[#eef2f8] text-[var(--invest-muted)] group-hover:text-[var(--invest-heading)]",
+                            : "bg-[var(--invest-surface-soft)] text-[var(--invest-muted)] group-hover:text-[var(--invest-heading)]",
                         ].join(" ")}
                       >
                         {item.mark}
@@ -114,7 +114,7 @@ export function AppSidebar() {
           ))}
         </nav>
 
-        <div className="mt-auto rounded-lg border border-[var(--invest-border)] bg-[#f8fafc] p-4">
+        <div className="mt-auto rounded-lg border border-[var(--invest-border)] bg-[var(--invest-surface-soft)] p-4">
           <p className="text-sm font-black text-[var(--invest-heading)]">
             Regra de leitura
           </p>
