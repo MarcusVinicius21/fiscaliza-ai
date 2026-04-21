@@ -10,6 +10,7 @@ const navGroups = [
     items: [
       { href: "/dashboard", label: "Dashboard", description: "Visão geral", mark: "D" },
       { href: "/uploads", label: "Uploads", description: "Importar dados", mark: "U" },
+      { href: "/search", label: "Busca", description: "Entidades e documentos", mark: "B" },
       { href: "/records", label: "Linhas", description: "Base carregada", mark: "L" },
       { href: "/alerts", label: "Alertas", description: "O que exige atenção", mark: "A" },
     ],

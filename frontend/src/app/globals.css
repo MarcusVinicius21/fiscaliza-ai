@@ -18,6 +18,7 @@
   --invest-primary: #315cff;
   --invest-primary-strong: #1d4ed8;
   --invest-info: #2f80ed;
+  --invest-info-strong: #1a6bb5;
   --invest-cyan: #12b8a6;
   --invest-danger: #e63946;
   --invest-warning: #f97316;
@@ -61,6 +62,7 @@ html[data-theme="dark"] {
   --invest-primary: #7aa2ff;
   --invest-primary-strong: #a9c2ff;
   --invest-info: #8ecbff;
+  --invest-info-strong: #8ecbff;
   --invest-cyan: #68d9cb;
   --invest-danger: #ff7a86;
   --invest-warning: #ffb36b;

@@ -14,6 +14,10 @@ const pageMeta: Record<string, { title: string; note: string }> = {
     title: "Enviar arquivo",
     note: "Importe dados com categoria clara.",
   },
+  search: {
+    title: "Busca",
+    note: "Procure fornecedores, aliases e documentos.",
+  },
   records: {
     title: "Linhas",
     note: "Consulte os registros carregados e seus vínculos com alertas.",
@@ -33,6 +37,10 @@ const pageMeta: Record<string, { title: string; note: string }> = {
   cities: {
     title: "Cidades",
     note: "Mantenha bases monitoradas.",
+  },
+  fornecedores: {
+    title: "Fornecedor",
+    note: "Veja o histórico consolidado desta entidade.",
   },
 };
 

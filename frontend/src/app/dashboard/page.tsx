@@ -365,18 +365,16 @@ export default function DashboardPage() {
       if (logsRes.error) throw new Error(logsRes.error.message);
 
       const uploadsData = (uploadsRes.data as unknown as UploadRecord[]) || [];
-      const analyzedUploads = uploadsData.filter(
-        (item) => item.analysis_status === "analyzed"
-      );
 
       setCityCount(citiesRes.count || 0);
       setUploads(uploadsData);
       setAlerts((alertsRes.data as unknown as AlertRecord[]) || []);
       setLogs((logsRes.data as AnalysisLog[]) || []);
 
-      if (analyzedUploads.length > 0) {
-        setSelectedUploadId((current) => current || analyzedUploads[0].id);
-      }
+      // Nota: a dashboard NÃO auto-seleciona upload. O detalhe só carrega
+      // depois que o usuário escolhe um arquivo no seletor. Isso evita dar
+      // a impressão de que algo está sendo recalculado ao abrir a página.
+      // Nenhuma chamada a IA, /analyze ou /process acontece aqui.
     } catch (error: unknown) {
       setErrorMessage(
         error instanceof Error ? error.message : "Falha ao carregar o dashboard."
@@ -404,10 +402,11 @@ export default function DashboardPage() {
     return map;
   }, [logs]);
 
-  const selectedUpload =
-    uploadsAnalisados.find((item) => item.id === selectedUploadId) ||
-    uploadsAnalisados[0] ||
-    null;
+  // Sem auto-fallback: se não houver seleção explícita, o upload é null
+  // e a dashboard mostra apenas o estado inicial (sem disparar nada).
+  const selectedUpload = selectedUploadId
+    ? uploadsAnalisados.find((item) => item.id === selectedUploadId) || null
+    : null;
 
   const selectedLog = selectedUpload
     ? latestLogByUpload.get(selectedUpload.id) || null
@@ -594,13 +593,15 @@ export default function DashboardPage() {
           <div className="rounded-lg border border-[var(--invest-border)] bg-white p-4 shadow-[var(--invest-shadow-soft)]">
             <label className="invest-label">Arquivo analisado</label>
             <select
-              value={selectedUpload?.id || ""}
+              value={selectedUploadId}
               onChange={(e) => setSelectedUploadId(e.target.value)}
               className="invest-select"
             >
-              {uploadsAnalisados.length === 0 && (
-                <option value="">Nenhum upload analisado</option>
-              )}
+              <option value="">
+                {uploadsAnalisados.length === 0
+                  ? "Nenhum upload analisado"
+                  : "Selecione um upload para ver a análise"}
+              </option>
 
               {uploadsAnalisados.map((upload) => (
                 <option key={upload.id} value={upload.id}>
@@ -660,10 +661,31 @@ export default function DashboardPage() {
       </section>
 
       {!selectedUpload ? (
-        <div className="rounded-lg border border-orange-200 bg-orange-50 p-5 text-sm text-orange-800">
-          Ainda não existe upload analisado. Rode a Etapa 5 em pelo menos um
-          arquivo para liberar o painel.
-        </div>
+        uploadsAnalisados.length === 0 ? (
+          <div className="rounded-lg border border-orange-200 bg-orange-50 p-5 text-sm text-orange-800">
+            Ainda não existe upload analisado. Rode a Etapa 5 em pelo menos um
+            arquivo para liberar o painel.
+          </div>
+        ) : (
+          <section className="rounded-lg border border-[var(--invest-border)] bg-white p-6 shadow-[var(--invest-shadow-soft)]">
+            <p className="invest-eyebrow">Seleção necessária</p>
+            <h2 className="mt-2 text-lg font-black text-[var(--invest-heading)]">
+              Escolha um upload para abrir a análise
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--invest-muted)]">
+              A dashboard mostra apenas resultados já salvos. Nada é
+              recalculado ou reanalisado automaticamente. Selecione um arquivo
+              no seletor acima para ver os alertas, resumos e tabelas daquele
+              upload.
+            </p>
+            <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-[var(--invest-faint)]">
+              {uploadsAnalisados.length}{" "}
+              {uploadsAnalisados.length === 1
+                ? "upload analisado disponível"
+                : "uploads analisados disponíveis"}
+            </p>
+          </section>
+        )
       ) : (
         <>
           <ChapterHeader label="Bloco 2" title="Principal sinal do arquivo" />
