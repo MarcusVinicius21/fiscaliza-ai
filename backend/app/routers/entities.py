@@ -1,3 +1,25 @@
+"""Router e helpers da camada de entidades (Fase 2B).
+
+Este módulo também atua como *fonte única* dos helpers de consulta
+compartilhados com `people.py` e `investigations.py` — especificamente:
+
+- `supabase`, `UpstreamQueryError`, `_raise_upstream_http_error`
+- `_select_in_chunks`, `_chunked`, `_execute_with_retry`
+- `_safe_amount`, `_raw`, `_raw_value`
+- `_format_date`, `_primary_date`, `_period_key`, `_summary`
+- `_fetch_entity`, `_fetch_aliases`, `_fetch_links`, `_fetch_records`,
+  `_fetch_uploads`, `_fetch_cities`
+
+Os outros routers importam estes helpers diretamente daqui de forma
+intencional, para evitar duplicação de lógica de retry, chunking e
+normalização de registros. A convenção é: se um helper é útil fora
+deste arquivo, ele vive aqui e mantém o prefixo `_` por estabilidade de
+nome (alterações de assinatura precisam ser coordenadas com os outros
+routers). Uma extração para `app.utils.entity_queries` está prevista,
+mas deve acontecer em um refactor próprio — não junto com mudanças de
+feature.
+"""
+
 import json
 import logging
 import os
@@ -171,6 +193,27 @@ def _primary_date(record: dict, upload_row: dict | None = None) -> str:
         or _format_date((upload_row or {}).get("created_at"))
         or "-"
     )
+
+
+def _period_key(record: dict, upload_row: dict | None = None) -> str:
+    """Return the YYYY-MM key for timeline buckets.
+
+    Handles both ISO (`YYYY-MM-DD`) and Brazilian (`DD/MM/YYYY`, `MM/YYYY`) formats.
+    Returns an empty string when no reliable date is available, so callers can
+    skip the row instead of storing a meaningless period label like `09/04/2`
+    (the old bug: `"09/04/2025"[:7]`).
+    """
+    raw = _primary_date(record, upload_row)
+    text = str(raw or "").strip()
+    if not text or text == "-":
+        return ""
+    if len(text) >= 7 and text[4:5] == "-":
+        return text[:7]
+    if len(text) >= 10 and text[2] == "/" and text[5] == "/":
+        return f"{text[6:10]}-{text[3:5]}"
+    if len(text) >= 7 and text[2] == "/":
+        return f"{text[3:7]}-{text[:2]}"
+    return ""
 
 
 def _summary(record: dict) -> str:
@@ -610,7 +653,7 @@ def supplier_overview(entity_id: str):
             upload = uploads.get(str(record.get("upload_id") or ""))
             category = str(record.get("category") or (upload or {}).get("category") or "other")
             amount = _safe_amount(record.get("valor_bruto"))
-            period = (_primary_date(record, upload) or "-")[:7]
+            period = _period_key(record, upload)
 
             category_groups[category]["records_count"] += 1
             category_groups[category]["total_amount"] += amount
@@ -639,7 +682,7 @@ def supplier_overview(entity_id: str):
                     city_groups[city_id]["records_count"] += 1
                     city_groups[city_id]["total_amount"] += amount
 
-            if period and period != "-":
+            if period:
                 timeline_groups[period]["records_count"] += 1
                 timeline_groups[period]["total_amount"] += amount
 

@@ -22,6 +22,9 @@ interface CityOption {
   state?: string | null;
 }
 
+const RAW_ERROR_PATTERN =
+  /failed to fetch|remoteprotocolerror|server disconnected|traceback|httpx|networkerror|load failed|typeerror/i;
+
 function safeDetail(payload: unknown, fallback: string) {
   const detail =
     payload &&
@@ -30,7 +33,20 @@ function safeDetail(payload: unknown, fallback: string) {
     typeof (payload as { detail?: unknown }).detail === "string"
       ? String((payload as { detail?: string }).detail).trim()
       : "";
-  return detail || fallback;
+
+  if (!detail) return fallback;
+  if (RAW_ERROR_PATTERN.test(detail)) return fallback;
+  return detail;
+}
+
+function safeNetworkMessage(error: unknown, fallback: string) {
+  if (error instanceof Error) {
+    const message = String(error.message || "").trim();
+    if (message && !RAW_ERROR_PATTERN.test(message)) {
+      return message;
+    }
+  }
+  return fallback;
 }
 
 export default function InvestigationsPage() {
@@ -76,14 +92,24 @@ export default function InvestigationsPage() {
         const response = await fetch(`${API_BASE}/investigations/server-supplier-links?${params.toString()}`);
         const payload = (await response.json().catch(() => null)) as InvestigationPayload | null;
         if (!response.ok) {
-          throw new Error(safeDetail(payload, "Nao foi possivel carregar os conflitos de papel agora."));
+          throw new Error(
+            safeDetail(
+              payload,
+              "Não foi possível carregar os conflitos de papel agora. Tente novamente em instantes."
+            )
+          );
         }
         if (!cancelled) {
           setLinksPayload(payload);
         }
       } catch (error: unknown) {
         if (!cancelled) {
-          setLinksError(error instanceof Error ? error.message : "Nao foi possivel carregar os conflitos de papel agora.");
+          setLinksError(
+            safeNetworkMessage(
+              error,
+              "Não foi possível carregar os conflitos de papel agora. Tente novamente em instantes."
+            )
+          );
         }
       } finally {
         if (!cancelled) {
@@ -115,14 +141,24 @@ export default function InvestigationsPage() {
         const response = await fetch(`${API_BASE}/investigations/name-matches?${params.toString()}`);
         const payload = (await response.json().catch(() => null)) as InvestigationPayload | null;
         if (!response.ok) {
-          throw new Error(safeDetail(payload, "Nao foi possivel carregar os matches de nome agora."));
+          throw new Error(
+            safeDetail(
+              payload,
+              "Não foi possível carregar os homônimos e matches de nome agora. Tente novamente em instantes."
+            )
+          );
         }
         if (!cancelled) {
           setNamesPayload(payload);
         }
       } catch (error: unknown) {
         if (!cancelled) {
-          setNamesError(error instanceof Error ? error.message : "Nao foi possivel carregar os matches de nome agora.");
+          setNamesError(
+            safeNetworkMessage(
+              error,
+              "Não foi possível carregar os homônimos e matches de nome agora. Tente novamente em instantes."
+            )
+          );
         }
       } finally {
         if (!cancelled) {
@@ -143,10 +179,10 @@ export default function InvestigationsPage() {
         <p className="invest-eyebrow">Hub investigativo</p>
         <div className="mt-3 max-w-3xl">
           <h1 className="invest-title text-2xl sm:text-[2rem]">
-            Investigacoes transversais
+            Investigações transversais
           </h1>
           <p className="invest-subtitle mt-3 text-sm sm:text-base">
-            Cruzamentos tecnicos para orientar apuracao humana, sem tratar nome parecido como prova automatica.
+            Cruzamentos técnicos entre pessoas, servidores e fornecedores — apenas para orientar apuração humana. Nome parecido, sozinho, não vira prova aqui.
           </p>
         </div>
       </section>
@@ -155,7 +191,7 @@ export default function InvestigationsPage() {
         <div className="grid gap-4 lg:grid-cols-3">
           <div>
             <label className="invest-label" htmlFor="investigations-confidence">
-              Confianca
+              Confiança
             </label>
             <select
               id="investigations-confidence"
@@ -164,15 +200,15 @@ export default function InvestigationsPage() {
               onChange={(event) => setConfidence(event.target.value)}
             >
               <option value="">Todas</option>
-              <option value="indicative">Indicio</option>
-              <option value="probable">Vinculo provavel</option>
-              <option value="confirmed">Vinculo confirmado</option>
+              <option value="indicative">Indício</option>
+              <option value="probable">Vínculo provável</option>
+              <option value="confirmed">Vínculo confirmado</option>
             </select>
           </div>
 
           <div>
             <label className="invest-label" htmlFor="investigations-type">
-              Match de nome
+              Tipo de match de nome
             </label>
             <select
               id="investigations-type"
@@ -181,8 +217,8 @@ export default function InvestigationsPage() {
               onChange={(event) => setCrossRefType(event.target.value)}
             >
               <option value="">Todos</option>
-              <option value="same_person_candidate">Mesma pessoa</option>
-              <option value="homonym_candidate">Homonimo</option>
+              <option value="same_person_candidate">Candidato a mesma pessoa</option>
+              <option value="homonym_candidate">Homônimo</option>
             </select>
           </div>
 
@@ -211,9 +247,9 @@ export default function InvestigationsPage() {
       <section className="invest-card p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="invest-section-title">Conflitos servidor x fornecedor</p>
+            <p className="invest-section-title">Conflitos servidor × fornecedor</p>
             <p className="mt-1 text-sm text-[var(--invest-muted)]">
-              Relacoes tecnicas em que um mesmo nome, documento ou contexto pede verificacao de papel.
+              Casos em que a mesma pessoa aparece como servidor e também ligada a fornecedor. Cada item precisa de checagem humana.
             </p>
           </div>
           <StatusPill tone="warning">{linksPayload?.total || 0} item(ns)</StatusPill>
@@ -226,7 +262,7 @@ export default function InvestigationsPage() {
             <p className="text-sm font-bold text-[var(--invest-danger)]">{linksError}</p>
           ) : !linksPayload || linksPayload.items.length === 0 ? (
             <p className="text-sm text-[var(--invest-muted)]">
-              Nenhum conflito de papel encontrado com os filtros atuais.
+              Ainda não há evidência suficiente nesta base para mostrar conflitos de papel confiáveis. Isso é bom sinal — mas tente trocar os filtros acima antes de concluir.
             </p>
           ) : (
             linksPayload.items.map((item) => <CrossRefCard key={item.id} item={item} />)
@@ -237,9 +273,9 @@ export default function InvestigationsPage() {
       <section className="invest-card p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="invest-section-title">Homonimos e matches de nome</p>
+            <p className="invest-section-title">Homônimos e matches de nome</p>
             <p className="mt-1 text-sm text-[var(--invest-muted)]">
-              Nome repetido nao e bug. Ele acende uma luz para apuracao humana e checagem de documento.
+              Nome repetido não é prova. Ele apenas acende uma luz para apuração humana e checagem de documento.
             </p>
           </div>
           <StatusPill tone="muted">{namesPayload?.total || 0} item(ns)</StatusPill>
@@ -252,7 +288,7 @@ export default function InvestigationsPage() {
             <p className="text-sm font-bold text-[var(--invest-danger)]">{namesError}</p>
           ) : !namesPayload || namesPayload.items.length === 0 ? (
             <p className="text-sm text-[var(--invest-muted)]">
-              Nenhum match de nome relevante apareceu com os filtros atuais.
+              Nenhum homônimo ou candidato a mesma pessoa com os filtros atuais. Solte a confiança ou troque o tipo de match para ampliar a busca.
             </p>
           ) : (
             namesPayload.items.map((item) => <CrossRefCard key={item.id} item={item} />)

@@ -66,8 +66,37 @@ function entityTypeLabel(value?: string | null) {
   if (value === "server") return "Servidor";
   if (value === "person") return "Pessoa";
   if (value === "supplier") return "Fornecedor";
-  if (value === "organization") return "Organizacao";
+  if (value === "organization") return "Organização";
   return "Entidade";
+}
+
+function roleLabel(value?: string | null) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return "";
+  const map: Record<string, string> = {
+    supplier: "fornecedor",
+    creditor: "credor",
+    contracted_party: "contratado",
+    beneficiary: "beneficiário",
+    server: "servidor",
+    person: "pessoa",
+    other: "outro",
+  };
+  return map[normalized] || normalized;
+}
+
+function formatRoleList(values?: string[] | null) {
+  if (!values || values.length === 0) return "";
+  const seen = new Set<string>();
+  const labels: string[] = [];
+  values.forEach((value) => {
+    const label = roleLabel(value);
+    if (label && !seen.has(label)) {
+      seen.add(label);
+      labels.push(label);
+    }
+  });
+  return labels.slice(0, 3).join(", ");
 }
 
 function entityHref(entity?: CrossRefEntity | null) {
@@ -80,18 +109,19 @@ function entityHref(entity?: CrossRefEntity | null) {
 function primaryEvidence(item: CrossRefCardItem) {
   const evidence = item.evidence_payload || {};
   if (evidence.shared_document) {
-    return `Documento em comum: ${formatDocument(evidence.shared_document)}`;
+    return `Mesmo documento nas duas bases: ${formatDocument(evidence.shared_document)}.`;
   }
   if (evidence.alias_references && evidence.alias_references.length > 0) {
-    return `Alias em comum: ${evidence.alias_references.slice(0, 2).join(", ")}`;
+    return `Alias em comum observado: ${evidence.alias_references.slice(0, 2).join(", ")}.`;
   }
   if (evidence.shared_uploads && evidence.shared_uploads.length > 0) {
-    return `${evidence.shared_uploads.length} upload(s) em comum`;
+    const total = evidence.shared_uploads.length;
+    return `Aparece em ${total} upload${total === 1 ? "" : "s"} em comum.`;
   }
   if (evidence.shared_normalized_name) {
-    return "Nome normalizado compartilhado";
+    return "Nome normalizado é idêntico. Pode ser a mesma pessoa ou um homônimo — precisa de apuração humana.";
   }
-  return "Exige apuracao humana antes de qualquer conclusao.";
+  return "Cruzamento técnico gerado para orientar apuração humana. Nenhuma conclusão automática é feita aqui.";
 }
 
 export function CrossRefCard({
@@ -138,21 +168,29 @@ export function CrossRefCard({
       </div>
 
       <p className="mt-4 text-sm leading-6 text-[var(--invest-muted)]">
-        {item.reason_summary || "Cruzamento tecnico gerado para orientar verificacao humana."}
+        {item.reason_summary || "Cruzamento técnico gerado para orientar apuração humana."}
       </p>
 
       <div className="mt-4 rounded-lg border border-[var(--invest-border)] bg-[var(--invest-surface-soft)] p-4">
         <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
-          Evidencia principal
+          Evidência principal
         </p>
         <p className="mt-2 text-sm leading-6 text-[var(--invest-muted)]">
           {primaryEvidence(item)}
         </p>
+        {(item.evidence_payload?.from_roles?.length || item.evidence_payload?.to_roles?.length) ? (
+          <p className="mt-3 text-xs leading-5 text-[var(--invest-faint)]">
+            Papéis observados:{" "}
+            {formatRoleList(item.evidence_payload?.from_roles) || "—"}
+            {" × "}
+            {formatRoleList(item.evidence_payload?.to_roles) || "—"}
+          </p>
+        ) : null}
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3">
         <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--invest-faint)]">
-          Exige apuracao
+          Exige apuração humana
         </p>
         {counterpart?.id ? (
           <Link href={entityHref(counterpart)} className="invest-button-secondary px-4">

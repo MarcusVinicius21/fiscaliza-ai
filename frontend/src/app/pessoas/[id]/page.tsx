@@ -102,6 +102,27 @@ function formatDocument(value?: string | null) {
   return value || "Sem documento";
 }
 
+const CROSS_REF_TYPE_LABELS: Record<string, string> = {
+  role_conflict: "Conflitos de papel",
+  same_person_candidate: "Candidatos a mesma pessoa",
+  homonym_candidate: "Homônimos",
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  supplier: "fornecedor",
+  creditor: "credor",
+  contracted_party: "contratado",
+  beneficiary: "beneficiário",
+  server: "servidor",
+  person: "pessoa",
+  other: "outro",
+};
+
+function humanRole(value?: string | null) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return ROLE_LABELS[normalized] || normalized || "—";
+}
+
 function safeDetail(payload: unknown, fallback: string) {
   const detail =
     payload &&
@@ -327,12 +348,12 @@ export default function PersonDetailPage() {
       <section className="page-header px-5 py-5 sm:px-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-3xl">
-            <p className="invest-eyebrow">Visao por pessoa</p>
+            <p className="invest-eyebrow">Visão por pessoa</p>
             <h1 className="invest-title mt-3 text-2xl sm:text-[2rem]">
               {overview.person.canonical_name}
             </h1>
             <p className="invest-subtitle mt-3 text-sm sm:text-base">
-              Consolidacao por entidade canonica com papeis observados, aparicoes e cruzamentos tecnicos que exigem apuracao.
+              Consolidação por entidade canônica com papéis observados, aparições e cruzamentos técnicos que pedem apuração humana.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <StatusPill tone={overview.person.entity_type === "server" ? "warning" : "info"}>
@@ -350,7 +371,7 @@ export default function PersonDetailPage() {
               Voltar para busca
             </Link>
             <Link href="/investigacoes" className="invest-button-secondary px-4">
-              Ver investigacoes
+              Ver investigações
             </Link>
           </div>
         </div>
@@ -397,9 +418,9 @@ export default function PersonDetailPage() {
         <article className="invest-card p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="invest-section-title">Papeis observados</p>
+              <p className="invest-section-title">Papéis observados</p>
               <p className="mt-1 text-sm text-[var(--invest-muted)]">
-                O mesmo nome pode aparecer em bases e funcoes diferentes. Isso nao e prova automatica.
+                O mesmo nome pode aparecer em bases e funções diferentes. Isso não é prova automática — só acende um sinal.
               </p>
             </div>
           </div>
@@ -407,12 +428,12 @@ export default function PersonDetailPage() {
           <div className="mt-4 flex flex-wrap gap-2">
             {overview.roles_observed.length === 0 ? (
               <p className="text-sm text-[var(--invest-muted)]">
-                Nenhum papel observado com seguranca ate aqui.
+                Nenhum papel observado com segurança até aqui.
               </p>
             ) : (
               overview.roles_observed.map((role) => (
                 <span key={role} className="app-chip">
-                  {role}
+                  {humanRole(role)}
                 </span>
               ))
             )}
@@ -425,7 +446,7 @@ export default function PersonDetailPage() {
             <div className="mt-3 flex flex-wrap gap-2">
               {Object.entries(overview.cross_reference_summary.totals_by_type).map(([key, value]) => (
                 <span key={key} className="app-chip">
-                  {key}: {value}
+                  {CROSS_REF_TYPE_LABELS[key] || key}: {value}
                 </span>
               ))}
             </div>
@@ -435,9 +456,9 @@ export default function PersonDetailPage() {
         <article className="invest-card p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="invest-section-title">Timeline simples</p>
+              <p className="invest-section-title">Linha do tempo</p>
               <p className="mt-1 text-sm text-[var(--invest-muted)]">
-                Evolucao temporal das aparicoes e dos valores relacionados.
+                Evolução mês a mês das aparições e dos valores relacionados.
               </p>
             </div>
           </div>
@@ -445,7 +466,7 @@ export default function PersonDetailPage() {
           <div className="mt-4 space-y-3">
             {overview.timeline.length === 0 ? (
               <p className="text-sm text-[var(--invest-muted)]">
-                Ainda nao ha referencia temporal suficiente para montar a serie.
+                Ainda não há referência temporal confiável para montar a série mensal.
               </p>
             ) : (
               overview.timeline.map((item) => {
@@ -478,7 +499,7 @@ export default function PersonDetailPage() {
             <div>
               <p className="invest-section-title">Conflitos de papel</p>
               <p className="mt-1 text-sm text-[var(--invest-muted)]">
-                Quando ha documento, nome ou contexto suficiente para acender um sinal entre pessoa e fornecedor.
+                Quando a mesma pessoa aparece como servidor e também ligada a fornecedor. Cada item precisa de verificação humana antes de virar denúncia.
               </p>
             </div>
             <StatusPill tone="warning">{conflictItems.length} item(ns)</StatusPill>
@@ -491,7 +512,7 @@ export default function PersonDetailPage() {
               <p className="text-sm font-bold text-[var(--invest-danger)]">{crossRefsError}</p>
             ) : conflictItems.length === 0 ? (
               <p className="text-sm text-[var(--invest-muted)]">
-                Nenhum conflito de papel detectado com criterio conservador ate aqui.
+                Nenhum conflito de papel detectado para esta pessoa nos uploads analisados até aqui.
               </p>
             ) : (
               conflictItems.map((item) => (
@@ -504,9 +525,9 @@ export default function PersonDetailPage() {
         <article className="invest-card p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="invest-section-title">Outros indicios e homonimos</p>
+              <p className="invest-section-title">Outros indícios e homônimos</p>
               <p className="mt-1 text-sm text-[var(--invest-muted)]">
-                Nome repetido nao e prova. Ele so acende luz para verificacao humana.
+                Nome repetido não é prova. Aqui ele apenas acende luz para verificação humana.
               </p>
             </div>
             <StatusPill tone="muted">{matchItems.length} item(ns)</StatusPill>
@@ -519,7 +540,7 @@ export default function PersonDetailPage() {
               <p className="text-sm font-bold text-[var(--invest-danger)]">{crossRefsError}</p>
             ) : matchItems.length === 0 ? (
               <p className="text-sm text-[var(--invest-muted)]">
-                Nenhum cruzamento adicional relevante foi encontrado com seguranca.
+                Nenhum homônimo ou candidato a mesma pessoa apareceu com evidência suficiente até aqui.
               </p>
             ) : (
               matchItems.map((item) => (
@@ -533,9 +554,9 @@ export default function PersonDetailPage() {
       <section className="invest-card p-5 sm:p-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="invest-section-title">Aparicoes da pessoa</p>
+            <p className="invest-section-title">Aparições em registros</p>
             <p className="mt-1 text-sm text-[var(--invest-muted)]">
-              Registros em que esta entidade aparece com papel observado.
+              Cada linha é um registro padronizado em que esta pessoa aparece, com o papel que ocupava.
             </p>
           </div>
 
@@ -591,7 +612,7 @@ export default function PersonDetailPage() {
                 <option value="">Todos</option>
                 {overview.roles_observed.map((role) => (
                   <option key={role} value={role}>
-                    {role}
+                    {humanRole(role)}
                   </option>
                 ))}
               </select>
@@ -640,14 +661,14 @@ export default function PersonDetailPage() {
                 ) : !appearances || appearances.items.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-4 py-5 text-sm text-[var(--invest-muted)]">
-                      Nenhuma aparicao encontrada com os filtros atuais.
+                      Nenhuma aparição encontrada com os filtros atuais. Tente limpar o upload, a categoria ou o papel acima.
                     </td>
                   </tr>
                 ) : (
                   appearances.items.map((item) => (
                     <tr key={item.record_id} className="border-t border-[var(--invest-border)] align-top">
                       <td className="px-4 py-4 text-sm text-[var(--invest-heading)]">{item.data || "-"}</td>
-                      <td className="px-4 py-4 text-sm text-[var(--invest-heading)]">{item.role_in_record || "-"}</td>
+                      <td className="px-4 py-4 text-sm text-[var(--invest-heading)]">{humanRole(item.role_in_record)}</td>
                       <td className="px-4 py-4 text-sm text-[var(--invest-muted)]">
                         <p className="font-bold text-[var(--invest-heading)]">{item.file_name || "Arquivo"}</p>
                         <p className="mt-1 text-xs">{item.category || "categoria"}</p>
@@ -669,7 +690,7 @@ export default function PersonDetailPage() {
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-[var(--invest-muted)]">
-            Pagina {appearances?.page || 1} de {totalPages}
+            Página {appearances?.page || 1} de {totalPages}
           </p>
           <div className="flex gap-2">
             <button
@@ -686,7 +707,7 @@ export default function PersonDetailPage() {
               disabled={(appearances?.page || 1) >= totalPages}
               onClick={() => setAppearancesPage((current) => current + 1)}
             >
-              Proxima
+              Próxima
             </button>
           </div>
         </div>

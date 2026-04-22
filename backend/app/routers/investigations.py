@@ -1,25 +1,64 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, HTTPException, Query
 
 try:
-    from app.routers.entities import UpstreamQueryError, _raise_upstream_http_error, _select_in_chunks, supabase
+    from app.routers.entities import (
+        UpstreamQueryError,
+        _execute_with_retry,
+        _raise_upstream_http_error,
+        _select_in_chunks,
+        supabase,
+    )
 except ModuleNotFoundError:
-    from backend.app.routers.entities import UpstreamQueryError, _raise_upstream_http_error, _select_in_chunks, supabase
+    from backend.app.routers.entities import (
+        UpstreamQueryError,
+        _execute_with_retry,
+        _raise_upstream_http_error,
+        _select_in_chunks,
+        supabase,
+    )
 
 
 router = APIRouter(tags=["investigations"])
+logger = logging.getLogger(__name__)
 CONFIDENCE_LEVELS = {"indicative", "probable", "confirmed"}
 NAME_MATCH_TYPES = {"same_person_candidate", "homonym_candidate"}
 
 
-def _fetch_cross_reference_rows(cross_ref_type: str | None = None, confidence_level: str | None = None) -> list[dict]:
-    query = supabase.table("entity_cross_references").select("*")
-    if cross_ref_type:
-        query = query.eq("cross_ref_type", cross_ref_type)
-    if confidence_level:
-        query = query.eq("confidence_label", confidence_level)
-    return query.execute().data or []
+def _fetch_cross_reference_rows(
+    cross_ref_type: str | None = None,
+    confidence_level: str | None = None,
+) -> list[dict]:
+    """Leitura resiliente da tabela `entity_cross_references`.
+
+    Antes, esta função fazia `query.execute()` direto e quebrava o
+    endpoint inteiro quando o PostgREST devolvia `RemoteProtocolError`
+    (`Server disconnected`). Agora a execução passa pelo
+    `_execute_with_retry` da `entities.py`, que:
+
+    - tenta até 3 vezes com backoff curto (0.2s, 0.5s, 0.9s)
+    - captura `RemoteProtocolError`, `ReadTimeout`, `ConnectError`
+      e demais `httpx.HTTPError`
+    - encerra com `UpstreamQueryError`, convertido em HTTP 503 controlado
+      pelos handlers dos endpoints
+
+    Nada de `except Exception: pass` — toda exaustão de retry vira
+    erro auditável no log e mensagem amigável na UI.
+    """
+
+    def _build_query():
+        query = supabase.table("entity_cross_references").select("*")
+        if cross_ref_type:
+            query = query.eq("cross_ref_type", cross_ref_type)
+        if confidence_level:
+            query = query.eq("confidence_label", confidence_level)
+        return query
+
+    response = _execute_with_retry(_build_query, "entity_cross_references")
+    return response.data or []
 
 
 def _filter_by_city(rows: list[dict], city_id: str | None) -> list[dict]:

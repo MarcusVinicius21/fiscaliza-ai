@@ -37,17 +37,27 @@ interface SearchPayload {
 const FILTERS: Array<{ value: EntityType; label: string }> = [
   { value: "all", label: "Todos" },
   { value: "supplier", label: "Fornecedor" },
-  { value: "organization", label: "Organizacao" },
+  { value: "organization", label: "Organização" },
   { value: "person", label: "Pessoa" },
   { value: "server", label: "Servidor" },
 ];
 
 const GROUP_LABELS: Record<string, string> = {
   supplier: "Fornecedores",
-  organization: "Organizacoes",
+  organization: "Organizações",
   person: "Pessoas",
   server: "Servidores",
   other: "Outros",
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  supplier: "fornecedor",
+  creditor: "credor",
+  contracted_party: "contratado",
+  beneficiary: "beneficiário",
+  server: "servidor",
+  person: "pessoa",
+  other: "outro",
 };
 
 function formatMoney(value: number) {
@@ -123,7 +133,7 @@ export default function SearchPage() {
             Buscar fornecedor, pessoa ou documento
           </h1>
           <p className="invest-subtitle mt-3 text-sm sm:text-base">
-            A busca amplia a camada de entidades sem reabrir o nucleo factual. Procure por nome canonico, alias ou documento.
+            Procure por nome canônico, alias observado no arquivo ou documento (CPF / CNPJ). A busca amplia a camada de entidades sem reabrir o núcleo factual.
           </p>
         </div>
       </section>
@@ -145,7 +155,7 @@ export default function SearchPage() {
               placeholder="Ex.: distribuidora completa, rafael cornelio, 12345678000199"
             />
             <p className="invest-helper">
-              A busca olha nome canonico, alias e documento.
+              A busca olha nome canônico, alias observado no arquivo e documento.
             </p>
           </div>
 
@@ -193,7 +203,7 @@ export default function SearchPage() {
             Nenhuma busca iniciada
           </p>
           <p className="mt-2 text-sm leading-6 text-[var(--invest-muted)]">
-            Comece por um fornecedor, uma pessoa, um alias visto no arquivo ou um documento.
+            Comece digitando um fornecedor, uma pessoa, um alias visto no arquivo ou um documento (CPF ou CNPJ, com ou sem pontuação).
           </p>
         </section>
       ) : null}
@@ -204,7 +214,7 @@ export default function SearchPage() {
             Nenhuma entidade encontrada
           </p>
           <p className="mt-2 text-sm leading-6 text-[var(--invest-muted)]">
-            Tente outra grafia, um alias observado no arquivo ou o documento sem pontuacao.
+            Tente outra grafia, um alias observado no arquivo ou o documento sem pontuação. A busca usa nome canônico, aliases e documento.
           </p>
         </section>
       ) : null}
@@ -265,12 +275,12 @@ export default function SearchPage() {
                       {item.roles_observed && item.roles_observed.length > 0 ? (
                         <div className="mt-4">
                           <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
-                            Papeis observados
+                            Papéis observados
                           </p>
                           <div className="mt-2 flex flex-wrap gap-2">
                             {item.roles_observed.slice(0, 5).map((role) => (
                               <span key={role} className="app-chip">
-                                {role}
+                                {ROLE_LABELS[role.toLowerCase()] || role}
                               </span>
                             ))}
                           </div>
@@ -295,11 +305,11 @@ export default function SearchPage() {
                       <div className="mt-5">
                         {href ? (
                           <Link href={href} className="invest-button inline-flex px-4">
-                            {isPerson ? "Abrir pessoa" : "Abrir historico"}
+                            {isPerson ? "Abrir pessoa" : "Abrir histórico"}
                           </Link>
                         ) : (
                           <span className="app-chip">
-                            Detalhe completo desta entidade entra nas proximas etapas
+                            Detalhe completo desta entidade entra nas próximas etapas
                           </span>
                         )}
                       </div>

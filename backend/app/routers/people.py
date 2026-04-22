@@ -13,6 +13,7 @@ try:
         _fetch_links,
         _fetch_records,
         _fetch_uploads,
+        _period_key,
         _primary_date,
         _raise_upstream_http_error,
         _raw_value,
@@ -30,6 +31,7 @@ except ModuleNotFoundError:
         _fetch_links,
         _fetch_records,
         _fetch_uploads,
+        _period_key,
         _primary_date,
         _raise_upstream_http_error,
         _raw_value,
@@ -217,7 +219,7 @@ def person_overview(entity_id: str):
             upload = uploads.get(str(record.get("upload_id") or ""))
             amount = _safe_amount(record.get("valor_bruto"))
             category = str(record.get("category") or (upload or {}).get("category") or "other")
-            period = (_primary_date(record, upload) or "-")[:7]
+            period = _period_key(record, upload)
 
             category_groups[category]["records_count"] += 1
             category_groups[category]["total_amount"] += amount
@@ -246,7 +248,7 @@ def person_overview(entity_id: str):
                     city_groups[city_id]["records_count"] += 1
                     city_groups[city_id]["total_amount"] += amount
 
-            if period and period != "-":
+            if period:
                 timeline_groups[period]["records_count"] += 1
                 timeline_groups[period]["total_amount"] += amount
 
