@@ -1,48 +1,40 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { Inter } from "next/font/google";
-import Script from "next/script";
 import { AppShellGate } from "@/components/app/app-shell-gate";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
-const themeInitScript = `
-(function () {
-  try {
-    var storageKey = "fiscaliza:theme";
-    var stored = window.localStorage.getItem(storageKey);
-    var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-    var theme = stored === "dark" || stored === "light" ? stored : prefersDark ? "dark" : "light";
-    document.documentElement.dataset.theme = theme;
-    document.documentElement.style.colorScheme = theme;
-  } catch (error) {
-    document.documentElement.dataset.theme = "light";
-    document.documentElement.style.colorScheme = "light";
-  }
-})();
-`;
-
 export const metadata: Metadata = {
   title: "Fiscaliza.AI",
-  description: "Plataforma de análise e auditoria assistida",
+  description: "Plataforma de analise e auditoria assistida",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const initialTheme = cookieStore.get("fiscaliza-theme")?.value === "dark" ? "dark" : "light";
+  const initialSidebarCollapsed = cookieStore.get("fiscaliza-sidebar-collapsed")?.value === "true";
+
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
-      <head>
-        <Script
-          id="fiscaliza-theme-init"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{ __html: themeInitScript }}
-        />
-      </head>
+    <html
+      lang="pt-BR"
+      data-theme={initialTheme}
+      style={{ colorScheme: initialTheme }}
+      suppressHydrationWarning
+    >
+      <head />
       <body className={inter.className}>
-        <AppShellGate>{children}</AppShellGate>
+        <AppShellGate
+          initialTheme={initialTheme}
+          initialSidebarCollapsed={initialSidebarCollapsed}
+        >
+          {children}
+        </AppShellGate>
       </body>
     </html>
   );

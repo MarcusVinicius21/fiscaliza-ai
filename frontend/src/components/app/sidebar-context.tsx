@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 
@@ -12,39 +13,55 @@ interface SidebarContextValue {
   toggle: () => void;
 }
 
+const STORAGE_KEY = "fiscaliza:sidebar-collapsed";
+const COOKIE_KEY = "fiscaliza-sidebar-collapsed";
+
 const SidebarContext = createContext<SidebarContextValue>({
   collapsed: false,
   toggle: () => {},
 });
 
-export function SidebarProvider({ children }: { children: React.ReactNode }) {
-  const [collapsed, setCollapsed] = useState(false);
-  const [mounted, setMounted] = useState(false);
+function persistCollapsed(collapsed: boolean) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(STORAGE_KEY, String(collapsed));
+  document.cookie = `${COOKIE_KEY}=${collapsed}; path=/; max-age=31536000; samesite=lax`;
+}
+
+export function SidebarProvider({
+  children,
+  initialCollapsed,
+}: {
+  children: React.ReactNode;
+  initialCollapsed: boolean;
+}) {
+  const [collapsed, setCollapsed] = useState(initialCollapsed);
 
   useEffect(() => {
-    setMounted(true);
-    const stored = localStorage.getItem("fiscaliza:sidebar-collapsed");
-    if (stored === "true") setCollapsed(true);
-  }, []);
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    const resolvedCollapsed = stored === "true" ? true : stored === "false" ? false : initialCollapsed;
+    setCollapsed(resolvedCollapsed);
+    persistCollapsed(resolvedCollapsed);
+  }, [initialCollapsed]);
 
   function toggle() {
     setCollapsed((prev) => {
       const next = !prev;
-      localStorage.setItem("fiscaliza:sidebar-collapsed", String(next));
+      persistCollapsed(next);
       return next;
     });
   }
 
-  if (!mounted) {
-    return (
-      <SidebarContext.Provider value={{ collapsed: false, toggle }}>
-        {children}
-      </SidebarContext.Provider>
-    );
-  }
+  const value = useMemo(
+    () => ({
+      collapsed,
+      toggle,
+    }),
+    [collapsed]
+  );
 
   return (
-    <SidebarContext.Provider value={{ collapsed, toggle }}>
+    <SidebarContext.Provider value={value}>
       {children}
     </SidebarContext.Provider>
   );

@@ -18,6 +18,13 @@ interface SearchItem {
   uploads_count: number;
   records_count: number;
   total_amount: number;
+  roles_observed?: string[];
+  cross_reference_counts?: {
+    total: number;
+    role_conflict: number;
+    same_person_candidate: number;
+    homonym_candidate: number;
+  };
 }
 
 interface SearchPayload {
@@ -30,14 +37,14 @@ interface SearchPayload {
 const FILTERS: Array<{ value: EntityType; label: string }> = [
   { value: "all", label: "Todos" },
   { value: "supplier", label: "Fornecedor" },
-  { value: "organization", label: "Organização" },
+  { value: "organization", label: "Organizacao" },
   { value: "person", label: "Pessoa" },
   { value: "server", label: "Servidor" },
 ];
 
 const GROUP_LABELS: Record<string, string> = {
   supplier: "Fornecedores",
-  organization: "Organizações",
+  organization: "Organizacoes",
   person: "Pessoas",
   server: "Servidores",
   other: "Outros",
@@ -85,13 +92,13 @@ export default function SearchPage() {
         limit: "20",
       });
       const response = await fetch(`${API_BASE}/entities/search?${params.toString()}`);
-      const data = (await response.json().catch(() => null)) as SearchPayload | null;
+      const data = (await response.json().catch(() => null)) as SearchPayload | { detail?: string } | null;
 
       if (!response.ok) {
         throw new Error((data as { detail?: string } | null)?.detail || "Falha ao buscar entidades.");
       }
 
-      setPayload(data);
+      setPayload(data as SearchPayload);
     } catch (error: unknown) {
       setPayload(null);
       setErrorMessage(
@@ -116,7 +123,7 @@ export default function SearchPage() {
             Buscar fornecedor, pessoa ou documento
           </h1>
           <p className="invest-subtitle mt-3 text-sm sm:text-base">
-            A busca da Etapa B organiza o histórico por entidade sem reabrir o núcleo factual. Procure pelo nome canônico, alias ou documento.
+            A busca amplia a camada de entidades sem reabrir o nucleo factual. Procure por nome canonico, alias ou documento.
           </p>
         </div>
       </section>
@@ -135,10 +142,10 @@ export default function SearchPage() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               className="invest-input"
-              placeholder="Ex.: distribuidora completa, jsl, 12345678000199"
+              placeholder="Ex.: distribuidora completa, rafael cornelio, 12345678000199"
             />
             <p className="invest-helper">
-              A busca olha nome canônico, alias e documento.
+              A busca olha nome canonico, alias e documento.
             </p>
           </div>
 
@@ -186,7 +193,7 @@ export default function SearchPage() {
             Nenhuma busca iniciada
           </p>
           <p className="mt-2 text-sm leading-6 text-[var(--invest-muted)]">
-            Comece por um fornecedor conhecido, um alias visto no arquivo ou um documento.
+            Comece por um fornecedor, uma pessoa, um alias visto no arquivo ou um documento.
           </p>
         </section>
       ) : null}
@@ -197,7 +204,7 @@ export default function SearchPage() {
             Nenhuma entidade encontrada
           </p>
           <p className="mt-2 text-sm leading-6 text-[var(--invest-muted)]">
-            Tente outra grafia, um alias observado no arquivo ou o documento sem pontuação.
+            Tente outra grafia, um alias observado no arquivo ou o documento sem pontuacao.
           </p>
         </section>
       ) : null}
@@ -218,8 +225,15 @@ export default function SearchPage() {
 
               <div className="mt-4 grid gap-4 lg:grid-cols-2">
                 {items.map((item) => {
-                  const canOpenSupplier =
+                  const isSupplier =
                     item.entity_type === "supplier" || item.entity_type === "organization";
+                  const isPerson =
+                    item.entity_type === "person" || item.entity_type === "server";
+                  const href = isSupplier
+                    ? `/fornecedores/${item.id}`
+                    : isPerson
+                      ? `/pessoas/${item.id}`
+                      : "";
 
                   return (
                     <article key={item.id} className="invest-card-highlight p-5">
@@ -232,7 +246,7 @@ export default function SearchPage() {
                             {formatDocument(item.document)}
                           </p>
                         </div>
-                        <StatusPill tone={canOpenSupplier ? "info" : "muted"}>
+                        <StatusPill tone={isSupplier ? "info" : isPerson ? "warning" : "muted"}>
                           {GROUP_LABELS[item.entity_type] || item.entity_type}
                         </StatusPill>
                       </div>
@@ -241,7 +255,27 @@ export default function SearchPage() {
                         <span className="app-chip">{item.uploads_count} uploads</span>
                         <span className="app-chip">{item.records_count} linhas</span>
                         <span className="app-chip">{formatMoney(item.total_amount)}</span>
+                        {(item.cross_reference_counts?.role_conflict || 0) > 0 ? (
+                          <StatusPill tone="warning">
+                            {item.cross_reference_counts?.role_conflict} conflito(s)
+                          </StatusPill>
+                        ) : null}
                       </div>
+
+                      {item.roles_observed && item.roles_observed.length > 0 ? (
+                        <div className="mt-4">
+                          <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
+                            Papeis observados
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {item.roles_observed.slice(0, 5).map((role) => (
+                              <span key={role} className="app-chip">
+                                {role}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
 
                       {item.aliases.length > 0 ? (
                         <div className="mt-4">
@@ -259,16 +293,13 @@ export default function SearchPage() {
                       ) : null}
 
                       <div className="mt-5">
-                        {canOpenSupplier ? (
-                          <Link
-                            href={`/fornecedores/${item.id}`}
-                            className="invest-button inline-flex px-4"
-                          >
-                            Abrir histórico
+                        {href ? (
+                          <Link href={href} className="invest-button inline-flex px-4">
+                            {isPerson ? "Abrir pessoa" : "Abrir historico"}
                           </Link>
                         ) : (
                           <span className="app-chip">
-                            Detalhe completo desta entidade entra nas próximas etapas
+                            Detalhe completo desta entidade entra nas proximas etapas
                           </span>
                         )}
                       </div>

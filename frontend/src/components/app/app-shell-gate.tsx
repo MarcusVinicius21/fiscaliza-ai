@@ -3,7 +3,15 @@
 import { usePathname } from "next/navigation";
 import { AppShell } from "./app-shell";
 
-export function AppShellGate({ children }: { children: React.ReactNode }) {
+export function AppShellGate({
+  children,
+  initialTheme,
+  initialSidebarCollapsed,
+}: {
+  children: React.ReactNode;
+  initialTheme: "light" | "dark";
+  initialSidebarCollapsed: boolean;
+}) {
   const pathname = usePathname();
   const withoutShell = pathname === "/" || pathname.startsWith("/login");
 
@@ -11,5 +19,12 @@ export function AppShellGate({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  return <AppShell>{children}</AppShell>;
+  return (
+    <AppShell
+      initialTheme={initialTheme}
+      initialSidebarCollapsed={initialSidebarCollapsed}
+    >
+      {children}
+    </AppShell>
+  );
 }

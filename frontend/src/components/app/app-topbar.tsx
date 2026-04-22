@@ -8,7 +8,7 @@ import { useTheme } from "./theme-context";
 const pageMeta: Record<string, { title: string; note: string }> = {
   dashboard: {
     title: "Dashboard",
-    note: "Veja primeiro o que mais chama atenção.",
+    note: "Veja primeiro o que mais chama atencao.",
   },
   uploads: {
     title: "Enviar arquivo",
@@ -16,15 +16,23 @@ const pageMeta: Record<string, { title: string; note: string }> = {
   },
   search: {
     title: "Busca",
-    note: "Procure fornecedores, aliases e documentos.",
+    note: "Procure fornecedores, pessoas, aliases e documentos.",
+  },
+  investigacoes: {
+    title: "Investigacoes",
+    note: "Cruze sinais tecnicos sem transformar hipotese em prova.",
+  },
+  pessoas: {
+    title: "Pessoa",
+    note: "Veja aparicoes, papeis e cruzamentos desta entidade.",
   },
   records: {
     title: "Linhas",
-    note: "Consulte os registros carregados e seus vínculos com alertas.",
+    note: "Consulte os registros carregados e seus vinculos com alertas.",
   },
   alerts: {
     title: "Alertas",
-    note: "Filtre sinais que exigem explicação.",
+    note: "Filtre sinais que exigem explicacao.",
   },
   creatives: {
     title: "Artes",
@@ -32,7 +40,7 @@ const pageMeta: Record<string, { title: string; note: string }> = {
   },
   clients: {
     title: "Clientes",
-    note: "Organize responsáveis locais.",
+    note: "Organize responsaveis locais.",
   },
   cities: {
     title: "Cidades",
@@ -40,7 +48,7 @@ const pageMeta: Record<string, { title: string; note: string }> = {
   },
   fornecedores: {
     title: "Fornecedor",
-    note: "Veja o histórico consolidado desta entidade.",
+    note: "Veja o historico consolidado desta entidade.",
   },
 };
 
@@ -54,7 +62,6 @@ function SidebarToggleIcon({ collapsed }: { collapsed: boolean }) {
       aria-hidden="true"
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* Outer panel border */}
       <rect
         x="1.5"
         y="1.5"
@@ -64,7 +71,6 @@ function SidebarToggleIcon({ collapsed }: { collapsed: boolean }) {
         stroke="currentColor"
         strokeWidth="1.4"
       />
-      {/* Vertical divider — the "sidebar" */}
       <line
         x1="6"
         y1="1.5"
@@ -74,7 +80,6 @@ function SidebarToggleIcon({ collapsed }: { collapsed: boolean }) {
         strokeWidth="1.4"
         strokeLinecap="round"
       />
-      {/* Arrow chevron that flips direction via transform */}
       <g
         style={{
           transformOrigin: "11px 9px",
@@ -144,7 +149,6 @@ export function AppTopbar() {
     <header className="sticky top-0 z-30 border-b border-[var(--invest-border)] bg-white/92 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8 xl:px-10">
       <div className="mx-auto flex w-full max-w-[1500px] items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
-          {/* Sidebar toggle — visible only on lg+ where sidebar exists */}
           <button
             type="button"
             onClick={toggle}
@@ -193,9 +197,9 @@ export function AppTopbar() {
             </div>
             <div>
               <p className="text-sm font-bold text-[var(--invest-heading)]">
-                Usuário técnico
+                Usuario tecnico
               </p>
-              <p className="text-xs text-[var(--invest-muted)]">Sessão local</p>
+              <p className="text-xs text-[var(--invest-muted)]">Sessao local</p>
             </div>
           </div>
         </div>

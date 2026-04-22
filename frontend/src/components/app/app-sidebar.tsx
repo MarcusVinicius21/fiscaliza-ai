@@ -8,23 +8,24 @@ const navGroups = [
   {
     title: "Investigar",
     items: [
-      { href: "/dashboard", label: "Dashboard", description: "Visão geral", mark: "D" },
+      { href: "/dashboard", label: "Dashboard", description: "Visao geral", mark: "D" },
       { href: "/uploads", label: "Uploads", description: "Importar dados", mark: "U" },
       { href: "/search", label: "Busca", description: "Entidades e documentos", mark: "B" },
+      { href: "/investigacoes", label: "Investigacoes", description: "Pessoas e fornecedores", mark: "I" },
       { href: "/records", label: "Linhas", description: "Base carregada", mark: "L" },
-      { href: "/alerts", label: "Alertas", description: "O que exige atenção", mark: "A" },
+      { href: "/alerts", label: "Alertas", description: "O que exige atencao", mark: "A" },
     ],
   },
   {
     title: "Comunicar",
     items: [
-      { href: "/creatives", label: "Artes", description: "Peças públicas", mark: "P" },
+      { href: "/creatives", label: "Artes", description: "Pecas publicas", mark: "P" },
     ],
   },
   {
     title: "Organizar",
     items: [
-      { href: "/clients", label: "Clientes", description: "Responsáveis", mark: "C" },
+      { href: "/clients", label: "Clientes", description: "Responsaveis", mark: "C" },
       { href: "/cities", label: "Cidades", description: "Bases monitoradas", mark: "M" },
     ],
   },
@@ -40,9 +41,8 @@ export function AppSidebar() {
         width: collapsed ? 0 : 268,
         transition: "width 300ms cubic-bezier(0.4, 0, 0.2, 1)",
       }}
-      className="hidden shrink-0 overflow-hidden min-h-dvh border-r border-[var(--invest-border)] bg-[var(--invest-surface)] shadow-[var(--invest-shadow-soft)] lg:flex lg:flex-col"
+      className="hidden min-h-dvh shrink-0 overflow-hidden border-r border-[var(--invest-border)] bg-[var(--invest-surface)] shadow-[var(--invest-shadow-soft)] lg:flex lg:flex-col"
     >
-      {/* Inner wrapper fades out slightly faster than the width closes */}
       <div
         style={{
           opacity: collapsed ? 0 : 1,
@@ -62,7 +62,7 @@ export function AppSidebar() {
             fiscaliza<span className="text-[var(--invest-heading)]">.ai</span>
           </div>
           <p className="mt-2 text-xs font-semibold leading-5 text-[var(--invest-muted)]">
-            Plataforma clara para ler dados públicos, explicar alertas e preservar provas.
+            Plataforma clara para ler dados publicos, explicar alertas e preservar provas.
           </p>
         </Link>
 
@@ -120,8 +120,7 @@ export function AppSidebar() {
             Regra de leitura
           </p>
           <p className="mt-2 text-xs leading-5 text-[var(--invest-muted)]">
-            Alerta não é condenação. É um sinal que precisa de explicação, prova
-            e checagem humana.
+            Indicio nao e condenacao. E um sinal que pede explicacao, prova e checagem humana.
           </p>
         </div>
       </div>

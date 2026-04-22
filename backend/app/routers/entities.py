@@ -27,6 +27,7 @@ supabase: Client = create_client(
 
 SEARCH_TYPES = ["supplier", "organization", "person", "server", "other"]
 SUPPLIER_TYPES = {"supplier", "organization"}
+PERSON_TYPES = {"person", "server"}
 RETRYABLE_HTTP_ERRORS = (
     httpx.RemoteProtocolError,
     httpx.ReadTimeout,
@@ -57,6 +58,46 @@ def _chunked(values: list[str], chunk_size: int = 400) -> list[list[str]]:
     return [values[index:index + chunk_size] for index in range(0, len(values), chunk_size)]
 
 
+def _execute_with_retry(query_factory, table: str, chunk_index: int = 1, total_chunks: int = 1):
+    last_error: Exception | None = None
+
+    for attempt, delay in enumerate(RETRY_BACKOFF_SECONDS, start=1):
+        try:
+            return query_factory().execute()
+        except RETRYABLE_HTTP_ERRORS as exc:
+            last_error = exc
+            logger.warning(
+                "Retryable Supabase error on %s chunk %s/%s attempt %s: %s",
+                table,
+                chunk_index,
+                total_chunks,
+                attempt,
+                exc,
+            )
+            if attempt < len(RETRY_BACKOFF_SECONDS):
+                time.sleep(delay)
+        except httpx.HTTPError as exc:
+            last_error = exc
+            logger.warning(
+                "HTTP error on %s chunk %s/%s attempt %s: %s",
+                table,
+                chunk_index,
+                total_chunks,
+                attempt,
+                exc,
+            )
+            if attempt < len(RETRY_BACKOFF_SECONDS):
+                time.sleep(delay)
+
+    raise UpstreamQueryError(
+        table,
+        chunk_index,
+        total_chunks,
+        len(RETRY_BACKOFF_SECONDS),
+        last_error or RuntimeError("unknown"),
+    )
+
+
 def _select_in_chunks(table: str, select_clause: str, column: str, values: list[str]) -> list[dict]:
     if not values:
         return []
@@ -65,46 +106,13 @@ def _select_in_chunks(table: str, select_clause: str, column: str, values: list[
     chunks = _chunked(values)
 
     for chunk_index, chunk in enumerate(chunks, start=1):
-        last_error: Exception | None = None
-
-        for attempt, delay in enumerate(RETRY_BACKOFF_SECONDS, start=1):
-            try:
-                response = (
-                    supabase.table(table)
-                    .select(select_clause)
-                    .in_(column, chunk)
-                    .execute()
-                )
-                rows.extend(response.data or [])
-                last_error = None
-                break
-            except RETRYABLE_HTTP_ERRORS as exc:
-                last_error = exc
-                logger.warning(
-                    "Retryable Supabase error on %s chunk %s/%s attempt %s: %s",
-                    table,
-                    chunk_index,
-                    len(chunks),
-                    attempt,
-                    exc,
-                )
-                if attempt < len(RETRY_BACKOFF_SECONDS):
-                    time.sleep(delay)
-            except httpx.HTTPError as exc:
-                last_error = exc
-                logger.warning(
-                    "HTTP error on %s chunk %s/%s attempt %s: %s",
-                    table,
-                    chunk_index,
-                    len(chunks),
-                    attempt,
-                    exc,
-                )
-                if attempt < len(RETRY_BACKOFF_SECONDS):
-                    time.sleep(delay)
-
-        if last_error is not None:
-            raise UpstreamQueryError(table, chunk_index, len(chunks), len(RETRY_BACKOFF_SECONDS), last_error)
+        response = _execute_with_retry(
+            lambda: supabase.table(table).select(select_clause).in_(column, chunk),
+            table,
+            chunk_index,
+            len(chunks),
+        )
+        rows.extend(response.data or [])
 
     return rows
 
@@ -174,7 +182,10 @@ def _summary(record: dict) -> str:
 
 
 def _fetch_entity(entity_id: str) -> dict:
-    response = supabase.table("entities").select("*").eq("id", entity_id).limit(1).execute()
+    response = _execute_with_retry(
+        lambda: supabase.table("entities").select("*").eq("id", entity_id).limit(1),
+        "entities",
+    )
     if not response.data:
         raise HTTPException(status_code=404, detail="Entidade não encontrada.")
     return response.data[0]
@@ -259,6 +270,62 @@ def _entity_stats(entity_ids: list[str]) -> dict[str, dict]:
             "total_amount": round(values["total_amount"], 2),
         }
     return normalized
+
+
+def _roles_by_entity(entity_ids: list[str]) -> dict[str, list[str]]:
+    links = _fetch_links(entity_ids)
+    grouped: dict[str, set[str]] = defaultdict(set)
+    for link in links:
+        entity_id = str(link.get("entity_id") or "")
+        role = str(link.get("role_in_record") or "").strip()
+        if entity_id and role:
+            grouped[entity_id].add(role)
+    return {entity_id: sorted(roles) for entity_id, roles in grouped.items()}
+
+
+def _cross_reference_counts(entity_ids: list[str]) -> dict[str, dict]:
+    if not entity_ids:
+        return {}
+
+    left_rows = _select_in_chunks(
+        "entity_cross_references",
+        "id, left_entity_id, right_entity_id, cross_ref_type, confidence_label, confidence_score",
+        "left_entity_id",
+        entity_ids,
+    )
+    right_rows = _select_in_chunks(
+        "entity_cross_references",
+        "id, left_entity_id, right_entity_id, cross_ref_type, confidence_label, confidence_score",
+        "right_entity_id",
+        entity_ids,
+    )
+
+    counts: dict[str, dict] = defaultdict(
+        lambda: {
+            "total": 0,
+            "role_conflict": 0,
+            "same_person_candidate": 0,
+            "homonym_candidate": 0,
+        }
+    )
+    seen: set[tuple[str, str]] = set()
+    target_ids = set(entity_ids)
+
+    for row in left_rows + right_rows:
+        row_id = str(row.get("id") or "")
+        for entity_id in (str(row.get("left_entity_id") or ""), str(row.get("right_entity_id") or "")):
+            if entity_id not in target_ids:
+                continue
+            dedupe_key = (row_id, entity_id)
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            counts[entity_id]["total"] += 1
+            ref_type = str(row.get("cross_ref_type") or "")
+            if ref_type in counts[entity_id]:
+                counts[entity_id][ref_type] += 1
+
+    return counts
 
 
 def _search_candidates(q: str, entity_type: str, limit: int) -> dict[str, int]:
@@ -424,11 +491,9 @@ def _build_supplier_alerts_bundle(entity_id: str) -> dict:
 
 
 def _compute_supplier_rank(current_entity_id: str) -> int | None:
-    supplier_rows = (
-        supabase.table("entities")
-        .select("id, entity_type")
-        .in_("entity_type", list(SUPPLIER_TYPES))
-        .execute()
+    supplier_rows = _execute_with_retry(
+        lambda: supabase.table("entities").select("id, entity_type").in_("entity_type", list(SUPPLIER_TYPES)),
+        "entities",
     )
     supplier_ids = [str(row["id"]) for row in (supplier_rows.data or [])]
     if not supplier_ids or current_entity_id not in supplier_ids:
@@ -470,6 +535,8 @@ def search_entities(
         entities_by_id = {str(entity["id"]): entity for entity in entities}
         aliases_map = _fetch_aliases(ordered_ids)
         stats_map = _entity_stats(ordered_ids)
+        roles_map = _roles_by_entity(ordered_ids)
+        cross_ref_counts = _cross_reference_counts(ordered_ids)
 
         grouped: dict[str, list[dict]] = {kind: [] for kind in SEARCH_TYPES}
         counts: dict[str, int] = {kind: 0 for kind in SEARCH_TYPES}
@@ -493,6 +560,16 @@ def search_entities(
                 "uploads_count": stats_map.get(entity_id, {}).get("uploads_count", 0),
                 "records_count": stats_map.get(entity_id, {}).get("records_count", 0),
                 "total_amount": stats_map.get(entity_id, {}).get("total_amount", 0.0),
+                "roles_observed": roles_map.get(entity_id, []),
+                "cross_reference_counts": cross_ref_counts.get(
+                    entity_id,
+                    {
+                        "total": 0,
+                        "role_conflict": 0,
+                        "same_person_candidate": 0,
+                        "homonym_candidate": 0,
+                    },
+                ),
             }
             kind = str(entity.get("entity_type") or "other")
             grouped.setdefault(kind, []).append(item)

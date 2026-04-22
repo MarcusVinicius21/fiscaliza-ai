@@ -5,10 +5,18 @@ import { AppTopbar } from "./app-topbar";
 import { SidebarProvider } from "./sidebar-context";
 import { ThemeProvider } from "./theme-context";
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  initialTheme,
+  initialSidebarCollapsed,
+}: {
+  children: React.ReactNode;
+  initialTheme: "light" | "dark";
+  initialSidebarCollapsed: boolean;
+}) {
   return (
-    <ThemeProvider>
-      <SidebarProvider>
+    <ThemeProvider initialTheme={initialTheme}>
+      <SidebarProvider initialCollapsed={initialSidebarCollapsed}>
         <div className="fiscaliza-shell min-h-dvh bg-[var(--invest-bg)] text-[var(--invest-text)]">
           <div className="flex min-h-dvh">
             <AppSidebar />
