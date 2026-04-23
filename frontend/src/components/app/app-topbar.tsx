@@ -22,6 +22,18 @@ const pageMeta: Record<string, { title: string; note: string }> = {
     title: "Investigacoes",
     note: "Cruze sinais tecnicos sem transformar hipotese em prova.",
   },
+  contratos: {
+    title: "Contratos",
+    note: "Siga o contrato, a licitacao de origem e os pagamentos vinculados.",
+  },
+  licitacoes: {
+    title: "Licitacoes",
+    note: "Entenda a origem factual das contratacoes.",
+  },
+  pagamentos: {
+    title: "Pagamentos",
+    note: "Veja a execucao financeira e o contrato ligado.",
+  },
   pessoas: {
     title: "Pessoa",
     note: "Veja aparicoes, papeis e cruzamentos desta entidade.",

@@ -17,6 +17,14 @@ const navGroups = [
     ],
   },
   {
+    title: "Cadeia do gasto",
+    items: [
+      { href: "/contratos", label: "Contratos", description: "Trilha contratual", mark: "C" },
+      { href: "/licitacoes", label: "Licitacoes", description: "Origem da despesa", mark: "L" },
+      { href: "/pagamentos", label: "Pagamentos", description: "Execucao financeira", mark: "G" },
+    ],
+  },
+  {
     title: "Comunicar",
     items: [
       { href: "/creatives", label: "Artes", description: "Pecas publicas", mark: "P" },

@@ -13,12 +13,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 from dotenv import load_dotenv
 try:
+    from app.routers.bids import router as bids_router
+    from app.routers.contracts import router as contracts_router
     from app.routers.entities import router as entities_router
     from app.routers.investigations import router as investigations_router
+    from app.routers.payments import router as payments_router
     from app.routers.people import router as people_router
 except ModuleNotFoundError:
+    from backend.app.routers.bids import router as bids_router
+    from backend.app.routers.contracts import router as contracts_router
     from backend.app.routers.entities import router as entities_router
     from backend.app.routers.investigations import router as investigations_router
+    from backend.app.routers.payments import router as payments_router
     from backend.app.routers.people import router as people_router
 
 load_dotenv()
@@ -32,9 +38,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(contracts_router)
+app.include_router(bids_router)
 app.include_router(entities_router)
 app.include_router(people_router)
 app.include_router(investigations_router)
+app.include_router(payments_router)
 
 supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
 
