@@ -470,7 +470,21 @@ def _resolve_related_alerts(entity: dict, alias_rows: list[dict], record_ids: se
         if alert_id in seen:
             continue
         seen.add(alert_id)
-        filtered.append(alert)
+        if record_ok:
+            link_source = "record"
+            link_label = "Ligado diretamente a linha"
+        elif supplier_ok:
+            link_source = "name_upload"
+            link_label = "Encontrado pelo nome no mesmo arquivo"
+        else:
+            link_source = "unknown"
+            link_label = "Precisa de conferencia"
+
+        filtered.append({
+            **alert,
+            "link_source": link_source,
+            "link_label": link_label,
+        })
 
     filtered.sort(key=lambda item: (_safe_amount(item.get("amount")) * -1, str(item.get("created_at") or "")))
     return filtered
@@ -754,6 +768,20 @@ def supplier_overview(entity_id: str):
                     for alias in alias_rows
                     if str(alias.get("alias_name") or "").strip()
                 }),
+                "alias_details": [
+                    {
+                        "alias_name": alias.get("alias_name"),
+                        "alias_type": alias.get("alias_type"),
+                        "source_upload_id": alias.get("source_upload_id"),
+                        "source_file_name": (
+                            uploads.get(str(alias.get("source_upload_id") or ""), {}).get("file_name")
+                            if alias.get("source_upload_id")
+                            else None
+                        ),
+                        "created_at": alias.get("created_at"),
+                    }
+                    for alias in sorted(alias_rows, key=lambda item: str(item.get("alias_name") or ""))
+                ],
             },
             "summary": {
                 "uploads_count": len(upload_ids),
@@ -804,6 +832,9 @@ def supplier_records(
     page_size: int = Query(20, ge=1, le=100),
     upload_id: str | None = Query(None),
     category: str | None = Query(None),
+    city_id: str | None = Query(None),
+    has_alert: bool | None = Query(None),
+    q: str | None = Query(None),
 ):
     try:
         bundle = _build_supplier_bundle(entity_id)
@@ -818,6 +849,8 @@ def supplier_records(
                 "id": alert.get("id"),
                 "title": alert.get("title"),
                 "severity": alert.get("severity"),
+                "link_source": alert.get("link_source") or "unknown",
+                "link_label": alert.get("link_label") or "Precisa de conferencia",
             }
             source_record_id = str(alert.get("source_record_id") or "")
             if source_record_id:
@@ -845,6 +878,7 @@ def supplier_records(
             items.append({
                 "record_id": record.get("id"),
                 "upload_id": record_upload_id,
+                "city_id": (upload or {}).get("city_id"),
                 "file_name": (upload or {}).get("file_name"),
                 "category": record_category,
                 "report_type": record.get("report_type") or (upload or {}).get("report_type"),
@@ -866,6 +900,28 @@ def supplier_records(
             city = city_map.get(str((upload or {}).get("city_id") or ""))
             item["city_name"] = city.get("name") if city else None
             item["state"] = city.get("state") if city else None
+
+        if city_id:
+            items = [item for item in items if str(item.get("city_id") or "") == city_id]
+
+        if has_alert is not None:
+            items = [item for item in items if bool(item.get("alerts")) is has_alert]
+
+        search_text = normalize_name(q or "")
+        if search_text:
+            items = [
+                item for item in items
+                if search_text in normalize_name(
+                    " ".join([
+                        str(item.get("file_name") or ""),
+                        str(item.get("category") or ""),
+                        str(item.get("document") or ""),
+                        str(item.get("tipo_ato") or ""),
+                        str(item.get("modalidade") or ""),
+                        str(item.get("summary") or ""),
+                    ])
+                )
+            ]
 
         items.sort(key=lambda row: (row["data"] or "", row["valor_bruto"]), reverse=True)
         total = len(items)

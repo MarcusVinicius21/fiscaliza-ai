@@ -82,7 +82,7 @@ export default function SupplierReportPage() {
         }
       } catch (error) {
         if (!cancelled) {
-          setErrorMessage(error instanceof Error ? error.message : "Não foi possível carregar o dossiê.");
+          setErrorMessage(error instanceof Error ? error.message : "Não foi possível carregar o relatório.");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -110,7 +110,7 @@ export default function SupplierReportPage() {
       <div className="page-shell">
         <section className="invest-card p-6">
           <p className="text-sm font-bold text-[var(--invest-danger)]">
-            {errorMessage || "Dossiê não disponível."}
+            {errorMessage || "Relatório não disponível."}
           </p>
         </section>
       </div>
@@ -128,20 +128,20 @@ export default function SupplierReportPage() {
   }));
   const topCategory = overview.categories[0];
   const limitationText = overview.categories.some((category) => category.category === "contracts")
-    ? "Ha registro contratual relacionado. Quando nao houver pagamento vinculado, leia como ausencia de chave automatica ou base complementar nao carregada."
-    : "A leitura consolida os registros disponiveis sem afirmar vinculo factual quando a cadeia automatica nao existir.";
+    ? "Há registro contratual relacionado. Quando não houver pagamento ligado automaticamente, leia como falta de informação no arquivo ou base complementar não carregada."
+    : "A leitura consolida as linhas disponíveis sem afirmar ligação automática quando ela não existir.";
 
   return (
     <PrintReportLayout
       title={overview.supplier.canonical_name}
-      subtitle={`Fornecedor 360 básico. ${formatDocument(overview.supplier.document)}.`}
+      subtitle={`Relatório básico do fornecedor. ${formatDocument(overview.supplier.document)}.`}
     >
       <ExecutiveSummaryPanel
-        title="Consolidado do fornecedor"
-        body="Este dossie organiza presenca em uploads, volume financeiro, alertas e registros de apoio. A leitura aponta concentracao e pontos de atencao, sem substituir conferencia documental."
+        title="Resumo do fornecedor"
+        body="Este relatório organiza presença em arquivos, valores, alertas e linhas de apoio. A leitura aponta concentração e pontos de atenção, sem substituir conferência documental."
         points={[
-          `${formatCurrency(overview.summary.total_amount)} em valor consolidado.`,
-          `${overview.summary.records_count} registro(s) em ${overview.summary.uploads_count} upload(s).`,
+          `${formatCurrency(overview.summary.total_amount)} em valor total encontrado.`,
+          `${overview.summary.records_count} linha(s) em ${overview.summary.uploads_count} arquivo(s).`,
           topCategory ? `Maior categoria: ${topCategory.category || "nao informado"}.` : "Categoria principal nao informada.",
         ]}
       />
@@ -149,9 +149,9 @@ export default function SupplierReportPage() {
       <DiagnosticCard
         title="Resumo executivo"
         items={[
-          { label: "Total identificado", value: formatCurrency(overview.summary.total_amount) },
-          { label: "Registros", value: overview.summary.records_count },
-          { label: "Uploads", value: overview.summary.uploads_count },
+          { label: "Valor total encontrado", value: formatCurrency(overview.summary.total_amount) },
+          { label: "Linhas", value: overview.summary.records_count },
+          { label: "Arquivos", value: overview.summary.uploads_count },
           { label: "Alertas", value: overview.summary.alerts_count },
         ]}
       />
@@ -181,7 +181,7 @@ export default function SupplierReportPage() {
         </article>
 
         <article className="invest-card p-5 sm:p-6">
-          <p className="invest-section-title">Uploads em que aparece</p>
+          <p className="invest-section-title">Arquivos em que aparece</p>
           <div className="mt-4 space-y-3">
             {overview.uploads.slice(0, 8).map((upload) => (
               <div key={upload.upload_id} className="invest-card-solid p-4">
@@ -191,7 +191,7 @@ export default function SupplierReportPage() {
                       {upload.file_name || "arquivo não informado"}
                     </p>
                     <p className="mt-1 text-xs text-[var(--invest-muted)]">
-                      {upload.records_count} registro(s)
+                      {upload.records_count} linha(s)
                     </p>
                   </div>
                   <p className="text-sm font-black text-[var(--invest-heading)]">
@@ -209,7 +209,7 @@ export default function SupplierReportPage() {
       <section className="grid gap-4 lg:grid-cols-2">
         <AttentionPointCard
           title="O que chama atenção"
-          body={`Valor consolidado e presença em ${overview.summary.uploads_count} upload(s) ajudam a priorizar a revisão humana deste fornecedor.`}
+          body={`Valor total encontrado e presença em ${overview.summary.uploads_count} arquivo(s) ajudam a priorizar a conferência deste fornecedor.`}
         />
         <AttentionPointCard
           title="Limitações da leitura"
@@ -217,8 +217,8 @@ export default function SupplierReportPage() {
           tone="info"
         />
         <AttentionPointCard
-          title="Vínculos ausentes"
-          body="Quando não houver vínculo factual, leia como ausência de chave automática ou base complementar não carregada."
+          title="Ligações ausentes"
+          body="Quando não houver ligação automática, leia como falta de informação no arquivo ou base complementar não carregada."
           tone="info"
         />
       </section>

@@ -289,6 +289,83 @@ Passou — apenas warnings LF/CRLF do Windows.
 
 ---
 
+## Execucao 4 — Etapa B1 consolidada: busca, fornecedores e rastreabilidade
+
+| Campo | Valor |
+|---|---|
+| **Data/Hora** | 2026-07-03 |
+| **Ferramenta** | Codex |
+| **Objetivo** | Fortalecer busca, listagem de fornecedores, Fornecedor 360, relatorio e resumo do arquivo sem migration e sem alterar processamento |
+
+### Arquivos alterados
+
+- `backend/app/routers/entities.py`
+- `frontend/src/app/search/page.tsx`
+- `frontend/src/app/fornecedores/page.tsx`
+- `frontend/src/app/fornecedores/[id]/page.tsx`
+- `frontend/src/app/relatorios/fornecedor/[id]/page.tsx`
+- `frontend/src/app/uploads/[id]/diagnostico/page.tsx`
+- `frontend/src/components/app/app-sidebar.tsx`
+- `frontend/src/components/product/guided-dashboard.tsx`
+- `frontend/src/components/product/investigative-product.tsx`
+- `frontend/src/lib/product-diagnostics.ts`
+- `docs/checkpoints/fase-2b-fornecedores-rastreabilidade.md`
+
+### O que mudou em /search
+
+- Modo fornecedores usa o backend como fonte principal por `GET /suppliers`.
+- Busca com termo usa `GET /entities/search`.
+- Fallback direto ao Supabase foi removido da tela.
+- Falha de API agora mostra mensagem simples e botao "Tentar novamente".
+
+### /fornecedores
+
+- Criada tela dedicada para fornecedores.
+- Lista por maior valor, mais linhas, mais alertas ou nome.
+- Permite busca por nome/documento usando backend.
+- Inclui botoes "Abrir historico" e "Abrir relatorio".
+
+### Fornecedor 360
+
+- Mostra nomes encontrados no arquivo, documento e arquivo de origem quando disponivel.
+- Melhorou filtros de linhas por arquivo, categoria, cidade, alerta e texto.
+- Diferencia alerta ligado diretamente a linha, encontrado pelo nome no mesmo arquivo ou pendente de conferencia.
+- Substituiu termos tecnicos por linguagem de usuario final.
+
+### Relatorio e resumo do arquivo
+
+- Relatorio do fornecedor usa linguagem simples: relatorio, linhas, arquivos, valor total encontrado e ligacao automatica.
+- Resumo do arquivo substitui termos tecnicos por "ligacoes encontradas" e "dados que ajudam a ligar informacoes".
+
+### Backend
+
+- Alteracao read-only em `entities.py`.
+- Alertas relacionados agora retornam `link_source` e `link_label`.
+- Overview do fornecedor inclui detalhes simples dos nomes encontrados no arquivo.
+- Registros do fornecedor aceitam filtros read-only adicionais.
+
+### Comandos executados
+
+- `git status --short`
+- `git log --oneline --decorate -8`
+- Validacoes finais desta rodada registradas na resposta do Codex.
+
+### Pendencias
+
+- Ranking de fornecedores ainda vem principalmente de `standardized_records`.
+- Contratos e pagamentos continuam como complemento visual/factual da Fase 2D.
+- Alertas encontrados por nome no mesmo arquivo ainda exigem conferencia.
+- Licitacoes seguem adiadas.
+- Sem CNPJ/QSA/PNCP/benchmark nesta etapa.
+
+### Confirmacoes de seguranca
+
+- [OK] Nao mexeu em banco, migrations, schema, ETL, raw_json, backfill, linker, SQL, /process ou /analyze.
+- [OK] Nao alterou calculos de contratos ou pagamentos.
+- [OK] NAO foi feito commit.
+
+---
+
 ## Execucao 3 — Correcao de hidratacao do tema
 
 | Campo | Valor |

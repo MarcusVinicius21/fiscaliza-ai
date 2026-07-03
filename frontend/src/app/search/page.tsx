@@ -1,11 +1,9 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { SkeletonBlock } from "@/components/app/skeleton-block";
 import { StatusPill } from "@/components/app/status-pill";
-import { parseMoney } from "@/lib/product-diagnostics";
-import { supabase } from "@/lib/supabase";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -44,19 +42,6 @@ interface SupplierDirectoryItem {
   records_count: number;
   total_amount: number;
   alerts_count: number;
-}
-
-interface SupplierOverviewLite {
-  supplier?: {
-    canonical_name?: string | null;
-    document?: string | null;
-  };
-  summary?: {
-    uploads_count?: number;
-    records_count?: number;
-    total_amount?: number;
-    alerts_count?: number;
-  };
 }
 
 interface SupplierDirectoryPayload {
@@ -111,6 +96,18 @@ function formatDocument(value?: string | null) {
   return value || "Sem documento";
 }
 
+function supplierFromSearchItem(item: SearchItem): SupplierDirectoryItem {
+  return {
+    id: item.id,
+    canonical_name: item.canonical_name,
+    document: item.document,
+    uploads_count: item.uploads_count,
+    records_count: item.records_count,
+    total_amount: item.total_amount,
+    alerts_count: 0,
+  };
+}
+
 export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<EntityType>("all");
@@ -129,119 +126,22 @@ export default function SearchPage() {
     setDirectoryMode(true);
 
     try {
-      const directoryResponse = await fetch(`${API_BASE}/suppliers?limit=12`);
-      if (directoryResponse.ok) {
-        const directoryPayload = (await directoryResponse.json()) as SupplierDirectoryPayload;
-        const suppliers = directoryPayload.suppliers || directoryPayload.items || [];
-        setSupplierDirectory(
-          suppliers
-            .filter((item) => item.records_count > 0 || item.total_amount > 0 || item.alerts_count > 0)
-            .sort((a, b) => b.total_amount - a.total_amount || b.records_count - a.records_count),
-        );
-        return;
+      const response = await fetch(`${API_BASE}/suppliers?limit=12`);
+      const data = (await response.json().catch(() => null)) as SupplierDirectoryPayload | null;
+
+      if (!response.ok) {
+        throw new Error("Não foi possível carregar os fornecedores agora.");
       }
 
-      const entitiesRes = await supabase
-        .from("entities")
-        .select("id, canonical_name, document, entity_type")
-        .in("entity_type", ["supplier", "organization"])
-        .order("canonical_name")
-        .limit(80);
-
-      if (entitiesRes.error) throw new Error(entitiesRes.error.message);
-      const entities = (entitiesRes.data || []) as Array<{
-        id: string;
-        canonical_name?: string | null;
-        document?: string | null;
-      }>;
-      const entityIds = entities.map((item) => item.id);
-
-      if (entityIds.length === 0) {
-        setSupplierDirectory([]);
-        return;
-      }
-
-      const linksRes = await supabase
-        .from("record_entity_links")
-        .select("entity_id, standardized_record_id")
-        .in("entity_id", entityIds)
-        .limit(5000);
-
-      if (linksRes.error) throw new Error(linksRes.error.message);
-      const links = (linksRes.data || []) as Array<{ entity_id: string; standardized_record_id: string }>;
-      const recordIds = Array.from(new Set(links.map((link) => link.standardized_record_id).filter(Boolean)));
-      const recordsRes = recordIds.length
-        ? await supabase
-            .from("standardized_records")
-            .select("id, upload_id, valor_bruto")
-            .in("id", recordIds)
-            .limit(5000)
-        : { data: [], error: null };
-
-      if (recordsRes.error) throw new Error(recordsRes.error.message);
-      const recordsById = new Map(
-        ((recordsRes.data || []) as Array<{ id: string; upload_id?: string | null; valor_bruto?: number | string | null }>).map((record) => [
-          record.id,
-          record,
-        ]),
-      );
-
-      const stats = new Map<string, { records: number; uploads: Set<string>; amount: number }>();
-      for (const link of links) {
-        const record = recordsById.get(link.standardized_record_id);
-        const current = stats.get(link.entity_id) || { records: 0, uploads: new Set<string>(), amount: 0 };
-        current.records += 1;
-        if (record?.upload_id) current.uploads.add(record.upload_id);
-        current.amount += parseMoney(record?.valor_bruto || 0);
-        stats.set(link.entity_id, current);
-      }
-
-      const initialItems = entities
-        .map((entity) => {
-          const current = stats.get(entity.id);
-          return {
-            id: entity.id,
-            canonical_name: entity.canonical_name || "Fornecedor não informado",
-            document: entity.document,
-            uploads_count: current?.uploads.size || 0,
-            records_count: current?.records || 0,
-            total_amount: current?.amount || 0,
-            alerts_count: 0,
-          };
-        })
-        .sort((a, b) => b.total_amount - a.total_amount || b.records_count - a.records_count)
-        .slice(0, 24);
-
-      const enriched = await Promise.all(
-        initialItems.map(async (item) => {
-          try {
-            const response = await fetch(`${API_BASE}/suppliers/${item.id}`);
-            if (!response.ok) return item;
-            const overview = (await response.json()) as SupplierOverviewLite;
-            return {
-              ...item,
-              canonical_name: overview.supplier?.canonical_name || item.canonical_name,
-              document: overview.supplier?.document ?? item.document,
-              uploads_count: overview.summary?.uploads_count ?? item.uploads_count,
-              records_count: overview.summary?.records_count ?? item.records_count,
-              total_amount: overview.summary?.total_amount ?? item.total_amount,
-              alerts_count: overview.summary?.alerts_count ?? item.alerts_count,
-            };
-          } catch {
-            return item;
-          }
-        }),
-      );
-
+      const suppliers = data?.suppliers || data?.items || [];
       setSupplierDirectory(
-        enriched
+        suppliers
           .filter((item) => item.records_count > 0 || item.total_amount > 0 || item.alerts_count > 0)
-          .sort((a, b) => b.total_amount - a.total_amount || b.records_count - a.records_count)
-          .slice(0, 12),
+          .sort((a, b) => b.total_amount - a.total_amount || b.records_count - a.records_count),
       );
     } catch (error: unknown) {
       setSupplierDirectory([]);
-      setErrorMessage(error instanceof Error ? error.message : "Falha ao carregar fornecedores.");
+      setErrorMessage(error instanceof Error ? error.message : "Não foi possível carregar os fornecedores agora.");
     } finally {
       setLoading(false);
     }
@@ -272,35 +172,66 @@ export default function SearchPage() {
       const data = (await response.json().catch(() => null)) as SearchPayload | { detail?: string } | null;
 
       if (!response.ok) {
-        throw new Error((data as { detail?: string } | null)?.detail || "Falha ao buscar entidades.");
+        throw new Error((data as { detail?: string } | null)?.detail || "Não foi possível buscar agora.");
       }
 
       setPayload(data as SearchPayload);
     } catch (error: unknown) {
       setPayload(null);
-      setErrorMessage(
-        error instanceof Error ? error.message : "Falha ao buscar entidades."
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Não foi possível buscar agora.");
     } finally {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const initialType = params.get("type") || params.get("entity_type");
+    const initialQuery = params.get("q") || "";
+
+    if (initialQuery) {
+      setQuery(initialQuery);
+    }
+    if (initialType === "supplier" || initialType === "organization") {
+      setFilter(initialType);
+      if (!initialQuery) {
+        loadSupplierDirectory();
+      }
+    }
+  }, []);
 
   const groups = useMemo(() => {
     const source = payload?.results || {};
     return Object.entries(source).filter(([, items]) => Array.isArray(items) && items.length > 0);
   }, [payload]);
 
+  const supplierSearchResults = useMemo(() => {
+    if (!payload?.results) return [];
+    return [
+      ...(payload.results.supplier || []),
+      ...(payload.results.organization || []),
+    ].map(supplierFromSearchItem);
+  }, [payload]);
+
+  const retry = () => {
+    if (directoryMode || filter === "supplier" || filter === "organization") {
+      loadSupplierDirectory();
+    } else {
+      handleSearch();
+    }
+  };
+
   return (
     <div className="page-shell">
       <section className="page-header px-5 py-5 sm:px-6">
-        <p className="invest-eyebrow">Camada de entidades</p>
+        <p className="invest-eyebrow">Busca</p>
         <div className="mt-3 max-w-3xl">
           <h1 className="invest-title text-2xl sm:text-[2rem]">
             Buscar fornecedor, pessoa ou documento
           </h1>
           <p className="invest-subtitle mt-3 text-sm sm:text-base">
-            Procure por nome canônico, alias observado no arquivo ou documento (CPF / CNPJ). A busca amplia a camada de entidades sem reabrir o núcleo factual.
+            Procure por nome principal, nome encontrado no arquivo ou documento (CPF / CNPJ).
           </p>
         </div>
       </section>
@@ -322,7 +253,7 @@ export default function SearchPage() {
               placeholder="Ex.: distribuidora completa, rafael cornelio, 12345678000199"
             />
             <p className="invest-helper">
-              A busca olha nome canônico, alias observado no arquivo e documento.
+              A busca olha nome principal, nomes encontrados no arquivo e documento.
             </p>
           </div>
 
@@ -336,7 +267,7 @@ export default function SearchPage() {
               onChange={(event) => {
                 const nextFilter = event.target.value as EntityType;
                 setFilter(nextFilter);
-                if (nextFilter === "supplier" && !query.trim()) {
+                if ((nextFilter === "supplier" || nextFilter === "organization") && !query.trim()) {
                   loadSupplierDirectory();
                 }
               }}
@@ -368,13 +299,9 @@ export default function SearchPage() {
           >
             Principais fornecedores
           </button>
-          <button
-            type="button"
-            className="invest-button-secondary px-4 py-2 text-sm"
-            onClick={() => setFilter("supplier")}
-          >
-            Buscar fornecedores
-          </button>
+          <Link href="/fornecedores" className="invest-button-secondary px-4 py-2 text-sm">
+            Ver todos os fornecedores
+          </Link>
         </div>
       </section>
 
@@ -387,6 +314,9 @@ export default function SearchPage() {
       {!loading && errorMessage ? (
         <section className="invest-card p-5">
           <p className="text-sm font-bold text-[var(--invest-danger)]">{errorMessage}</p>
+          <button type="button" className="invest-button-secondary mt-4 px-4" onClick={retry}>
+            Tentar novamente
+          </button>
         </section>
       ) : null}
 
@@ -396,72 +326,36 @@ export default function SearchPage() {
             Nenhuma busca iniciada
           </p>
           <p className="mt-2 text-sm leading-6 text-[var(--invest-muted)]">
-            Comece digitando um fornecedor, uma pessoa, um alias visto no arquivo ou um documento (CPF ou CNPJ, com ou sem pontuação).
+            Comece digitando um fornecedor, uma pessoa, um nome visto no arquivo ou um documento.
           </p>
         </section>
       ) : null}
 
       {!loading && directoryMode && !errorMessage ? (
-        <section className="invest-card p-5 sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="invest-section-title">Principais fornecedores</p>
-              <p className="mt-1 text-sm text-[var(--invest-muted)]">
-                Fornecedores encontrados nos registros já processados, ordenados por valor consolidado.
-              </p>
-            </div>
-            <StatusPill tone="muted">{supplierDirectory.length} fornecedor(es)</StatusPill>
-          </div>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            {supplierDirectory.length === 0 ? (
-              <p className="text-sm text-[var(--invest-muted)]">
-                Nenhum fornecedor com registros vinculados foi encontrado neste momento.
-              </p>
-            ) : (
-              supplierDirectory.map((item) => (
-                <article key={item.id} className="invest-card-highlight p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-lg font-black text-[var(--invest-heading)]">
-                        {item.canonical_name}
-                      </p>
-                      <p className="mt-1 text-sm text-[var(--invest-muted)]">
-                        {formatDocument(item.document)}
-                      </p>
-                    </div>
-                    <StatusPill tone="info">Fornecedor</StatusPill>
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <span className="app-chip">{formatMoney(item.total_amount)}</span>
-                    <span className="app-chip">{item.uploads_count} upload(s)</span>
-                    <span className="app-chip">{item.records_count} linha(s)</span>
-                    <span className="app-chip">{item.alerts_count} alerta(s)</span>
-                  </div>
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    <Link href={`/fornecedores/${item.id}`} className="invest-button inline-flex px-4">
-                      Abrir histórico
-                    </Link>
-                    <Link href={`/relatorios/fornecedor/${item.id}`} className="invest-button-secondary inline-flex px-4">
-                      Abrir dossiê
-                    </Link>
-                  </div>
-                </article>
-              ))
-            )}
-          </div>
-        </section>
+        <SupplierCardsSection
+          title="Principais fornecedores"
+          description="Fornecedores encontrados nos arquivos já analisados, ordenados por valor total encontrado."
+          suppliers={supplierDirectory}
+        />
       ) : null}
 
       {!loading && hasSearched && !directoryMode && !errorMessage && groups.length === 0 ? (
         <section className="invest-card p-5">
           <p className="text-sm font-bold text-[var(--invest-heading)]">
-            Nenhuma entidade encontrada
+            Nenhum resultado encontrado
           </p>
           <p className="mt-2 text-sm leading-6 text-[var(--invest-muted)]">
-            Tente outra grafia, um alias observado no arquivo ou o documento sem pontuação. A busca usa nome canônico, aliases e documento.
+            Tente outra grafia, um nome encontrado no arquivo ou o documento sem pontuação.
           </p>
         </section>
+      ) : null}
+
+      {!loading && !directoryMode && supplierSearchResults.length > 0 ? (
+        <SupplierCardsSection
+          title="Fornecedores encontrados"
+          description="Resultado da busca usando a API principal do Fiscaliza.AI."
+          suppliers={supplierSearchResults}
+        />
       ) : null}
 
       {!loading && !directoryMode && groups.length > 0 ? (
@@ -480,10 +374,8 @@ export default function SearchPage() {
 
               <div className="mt-4 grid gap-4 lg:grid-cols-2">
                 {items.map((item) => {
-                  const isSupplier =
-                    item.entity_type === "supplier" || item.entity_type === "organization";
-                  const isPerson =
-                    item.entity_type === "person" || item.entity_type === "server";
+                  const isSupplier = item.entity_type === "supplier" || item.entity_type === "organization";
+                  const isPerson = item.entity_type === "person" || item.entity_type === "server";
                   const href = isSupplier
                     ? `/fornecedores/${item.id}`
                     : isPerson
@@ -507,12 +399,12 @@ export default function SearchPage() {
                       </div>
 
                       <div className="mt-4 flex flex-wrap gap-2">
-                        <span className="app-chip">{item.uploads_count} uploads</span>
-                        <span className="app-chip">{item.records_count} linhas</span>
+                        <span className="app-chip">{item.uploads_count} arquivo(s)</span>
+                        <span className="app-chip">{item.records_count} linha(s)</span>
                         <span className="app-chip">{formatMoney(item.total_amount)}</span>
                         {(item.cross_reference_counts?.role_conflict || 0) > 0 ? (
                           <StatusPill tone="warning">
-                            {item.cross_reference_counts?.role_conflict} conflito(s)
+                            {item.cross_reference_counts?.role_conflict} ponto(s) para conferir
                           </StatusPill>
                         ) : null}
                       </div>
@@ -520,7 +412,7 @@ export default function SearchPage() {
                       {item.roles_observed && item.roles_observed.length > 0 ? (
                         <div className="mt-4">
                           <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
-                            Papéis observados
+                            Como aparece
                           </p>
                           <div className="mt-2 flex flex-wrap gap-2">
                             {item.roles_observed.slice(0, 5).map((role) => (
@@ -535,7 +427,7 @@ export default function SearchPage() {
                       {item.aliases.length > 0 ? (
                         <div className="mt-4">
                           <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
-                            Aliases observados
+                            Nomes encontrados no arquivo
                           </p>
                           <div className="mt-2 flex flex-wrap gap-2">
                             {item.aliases.map((alias) => (
@@ -555,13 +447,13 @@ export default function SearchPage() {
                             </Link>
                             {isSupplier ? (
                               <Link href={`/relatorios/fornecedor/${item.id}`} className="invest-button-secondary inline-flex px-4">
-                                Abrir dossiê
+                                Abrir relatório
                               </Link>
                             ) : null}
                           </div>
                         ) : (
                           <span className="app-chip">
-                            Detalhe completo desta entidade entra nas próximas etapas
+                            Detalhe completo entra nas próximas etapas
                           </span>
                         )}
                       </div>
@@ -574,5 +466,67 @@ export default function SearchPage() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+function SupplierCardsSection({
+  title,
+  description,
+  suppliers,
+}: {
+  title: string;
+  description: string;
+  suppliers: SupplierDirectoryItem[];
+}) {
+  return (
+    <section className="invest-card p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="invest-section-title">{title}</p>
+          <p className="mt-1 text-sm text-[var(--invest-muted)]">
+            {description}
+          </p>
+        </div>
+        <StatusPill tone="muted">{suppliers.length} fornecedor(es)</StatusPill>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        {suppliers.length === 0 ? (
+          <p className="text-sm text-[var(--invest-muted)]">
+            Nenhum fornecedor com linhas ligadas foi encontrado neste momento.
+          </p>
+        ) : (
+          suppliers.map((item) => (
+            <article key={item.id} className="invest-card-highlight p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-lg font-black text-[var(--invest-heading)]">
+                    {item.canonical_name}
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--invest-muted)]">
+                    {formatDocument(item.document)}
+                  </p>
+                </div>
+                <StatusPill tone="info">Fornecedor</StatusPill>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <span className="app-chip">{formatMoney(item.total_amount)}</span>
+                <span className="app-chip">{item.uploads_count} arquivo(s)</span>
+                <span className="app-chip">{item.records_count} linha(s)</span>
+                <span className="app-chip">{item.alerts_count} alerta(s)</span>
+              </div>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Link href={`/fornecedores/${item.id}`} className="invest-button inline-flex px-4">
+                  Abrir histórico
+                </Link>
+                <Link href={`/relatorios/fornecedor/${item.id}`} className="invest-button-secondary inline-flex px-4">
+                  Abrir relatório
+                </Link>
+              </div>
+            </article>
+          ))
+        )}
+      </div>
+    </section>
   );
 }

@@ -181,7 +181,7 @@ export function buildGuidedSteps(params: {
       number: "3",
       title: "Veja quem recebeu mais",
       description: "Abra a lista de fornecedores por maior valor.",
-      href: "/search?type=supplier",
+      href: "/fornecedores",
       cta: "Ver fornecedores",
     },
     {
@@ -288,8 +288,8 @@ export function GuidedDashboardHero({
 
           <div className="mt-6 flex flex-wrap gap-3">
             <ActionLink href={uploadHref || "/uploads"}>Ver resumo do arquivo</ActionLink>
-            <ActionLink href="/search?type=supplier" variant="secondary">Ver fornecedores</ActionLink>
-            <ActionLink href={reportHref || "/search"} variant="secondary">
+            <ActionLink href="/fornecedores" variant="secondary">Ver fornecedores</ActionLink>
+            <ActionLink href={reportHref || "/fornecedores"} variant="secondary">
               {"Gerar relat\u00f3rio"}
             </ActionLink>
           </div>
@@ -317,7 +317,7 @@ export function GuidedDashboardHero({
 
 export function DashboardActionCarousel({
   uploadHref,
-  supplierHref = "/search",
+  supplierHref = "/fornecedores",
   reportHref,
 }: {
   uploadHref?: string;
@@ -351,7 +351,7 @@ export function DashboardActionCarousel({
     {
       title: "Relatório para imprimir",
       description: "Leve a análise para reunião",
-      href: reportHref || "/search",
+      href: reportHref || "/fornecedores",
       icon: "report",
       className: "from-violet-50 via-white to-violet-100/60 text-violet-700",
       iconClassName: "border-violet-100 bg-violet-50 text-violet-600",
@@ -478,7 +478,7 @@ export function InvestigationSuggestionCard({
           Você ainda pode abrir a busca e procurar por pessoa ou fornecedor.
         </p>
         <div className="mt-4">
-          <ActionLink href="/search">Ir para busca</ActionLink>
+          <ActionLink href="/fornecedores">Ver fornecedores</ActionLink>
         </div>
       </section>
     );

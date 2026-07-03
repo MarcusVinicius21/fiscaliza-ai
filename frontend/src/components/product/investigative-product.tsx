@@ -137,30 +137,30 @@ export function FactLinkStatusSummary({
     <section className="invest-card p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="invest-section-title">Status dos vínculos factuais</p>
+          <p className="invest-section-title">Status das ligações encontradas</p>
           <p className="mt-1 text-sm text-[var(--invest-muted)]">
-            A ausência de vínculo indica lacuna de chave no arquivo ou base relacionada ainda não carregada.
+            Quando não encontramos ligação automática, pode faltar informação no arquivo ou uma base relacionada ainda não foi carregada.
           </p>
         </div>
         <StatusPill tone={hasMissingLinks ? "warning" : "success"}>
-          {hasMissingLinks ? "requer análise humana" : "cadeia vinculada"}
+          {hasMissingLinks ? "precisa de conferência" : "ligações encontradas"}
         </StatusPill>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <div className="invest-card-solid p-4">
           <p className="metric-label">Contratos</p>
           <p className="metric-value mt-2">{contracts.total}</p>
-          <p className="mt-1 text-xs text-[var(--invest-muted)]">{contracts.unlinked} sem licitação vinculada</p>
+          <p className="mt-1 text-xs text-[var(--invest-muted)]">{contracts.unlinked} sem licitação ligada automaticamente</p>
         </div>
         <div className="invest-card-solid p-4">
           <p className="metric-label">Pagamentos</p>
           <p className="metric-value mt-2">{payments.total}</p>
-          <p className="mt-1 text-xs text-[var(--invest-muted)]">{payments.unlinked} sem contrato vinculado</p>
+          <p className="mt-1 text-xs text-[var(--invest-muted)]">{payments.unlinked} sem contrato ligado automaticamente</p>
         </div>
         <div className="invest-card-solid p-4">
           <p className="metric-label">Licitações</p>
           <p className="metric-value mt-2">{bids.total}</p>
-          <p className="mt-1 text-xs text-[var(--invest-muted)]">{bids.total === 0 ? "upload de licitações adiado" : `${bids.unlinked} sem vínculo`}</p>
+          <p className="mt-1 text-xs text-[var(--invest-muted)]">{bids.total === 0 ? "arquivo de licitações adiado" : `${bids.unlinked} sem ligação`}</p>
         </div>
       </div>
     </section>
@@ -186,7 +186,7 @@ export function SupportRecordsTable({ records }: { records: SupportRecordItem[] 
     <section className="invest-card p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="invest-section-title">Registros de apoio</p>
+          <p className="invest-section-title">Linhas de apoio</p>
           <p className="mt-1 text-sm text-[var(--invest-muted)]">
             Amostra das linhas usadas para contextualizar o recorte. Nao substitui conferencia documental.
           </p>
@@ -208,12 +208,12 @@ export function SupportRecordsTable({ records }: { records: SupportRecordItem[] 
           <tbody>
             {records.length === 0 ? (
               <tr>
-                <td colSpan={6}>Nenhum registro de apoio disponivel neste recorte.</td>
+                <td colSpan={6}>Nenhuma linha de apoio disponivel neste recorte.</td>
               </tr>
             ) : (
               records.map((record) => (
                 <tr key={record.id}>
-                  <td>{record.file_name || "upload atual"}</td>
+                  <td>{record.file_name || "arquivo atual"}</td>
                   <td>{record.category || "nao informado"}</td>
                   <td>{record.supplier || "nao informado"}</td>
                   <td>{record.date || "nao informado"}</td>
@@ -251,7 +251,7 @@ export function PrintReportLayout({
       <section className="page-header report-cover px-5 py-5 sm:px-6 print:border-0 print:shadow-none">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="invest-eyebrow">Dossiê investigativo</p>
+            <p className="invest-eyebrow">Relatório para imprimir</p>
             <h1 className="invest-title mt-3 text-2xl sm:text-[2rem]">{title}</h1>
             <p className="invest-subtitle mt-3 text-sm sm:text-base">{subtitle}</p>
           </div>

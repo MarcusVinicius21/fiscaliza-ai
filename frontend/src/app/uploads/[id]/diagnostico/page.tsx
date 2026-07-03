@@ -35,7 +35,7 @@ export default function UploadDiagnosticPage() {
         if (!cancelled) setDiagnostic(payload);
       } catch (error) {
         if (!cancelled) {
-          setErrorMessage(error instanceof Error ? error.message : "Não foi possível carregar o diagnóstico.");
+          setErrorMessage(error instanceof Error ? error.message : "Não foi possível carregar o resumo do arquivo.");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -63,7 +63,7 @@ export default function UploadDiagnosticPage() {
       <div className="page-shell">
         <section className="invest-card p-6">
           <p className="text-sm font-bold text-[var(--invest-danger)]">
-            {errorMessage || "Diagnóstico não disponível."}
+            {errorMessage || "Resumo do arquivo não disponível."}
           </p>
         </section>
       </div>
@@ -87,12 +87,12 @@ export default function UploadDiagnosticPage() {
       <section className="page-header px-5 py-5 sm:px-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-3xl">
-            <p className="invest-eyebrow">Diagnóstico do upload</p>
+            <p className="invest-eyebrow">Resumo do arquivo</p>
             <h1 className="invest-title mt-3 text-2xl sm:text-[2rem]">
               {upload.file_name || "Arquivo sem nome"}
             </h1>
             <p className="invest-subtitle mt-3 text-sm sm:text-base">
-              Resumo de qualidade, concentração e vínculos factuais sem alterar dados de origem.
+              Resumo de qualidade, concentração e ligações encontradas sem alterar dados de origem.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <StatusPill tone="info">{upload.category || "categoria não informada"}</StatusPill>
@@ -104,7 +104,7 @@ export default function UploadDiagnosticPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href={`/relatorios/upload/${upload.id}`} className="invest-button px-4">
-              Abrir dossiê
+              Abrir relatório
             </Link>
             <Link href="/uploads" className="invest-button-secondary px-4">
               Voltar
@@ -115,9 +115,9 @@ export default function UploadDiagnosticPage() {
 
       <ExecutiveSummaryPanel
         title="Leitura executiva do arquivo"
-        body="Este diagnostico organiza volume, valor identificado, concentracao por fornecedor e lacunas de vinculo factual. Ele serve para priorizar revisao e nao substitui conferencia documental."
+        body="Este resumo organiza volume, valor identificado, concentração por fornecedor e ligações ausentes. Ele serve para priorizar conferência e não substitui conferência documental."
         points={[
-          `${diagnostic.summary.records_count} registro(s) lido(s) neste upload.`,
+          `${diagnostic.summary.records_count} linha(s) lida(s) neste arquivo.`,
           `${formatCurrency(diagnostic.summary.total_amount)} identificado no recorte atual.`,
           missingKeys
             ? "Faltam chaves no arquivo para ligacao automatica."
@@ -130,7 +130,7 @@ export default function UploadDiagnosticPage() {
         items={[
           { label: "Arquivo", value: upload.file_name || "nao informado", hint: `${upload.category || "categoria nao informada"} / ${upload.report_type || "tipo nao informado"}` },
           { label: "Cidade/cliente", value: cityLabel },
-          { label: "Registros", value: diagnostic.summary.records_count },
+          { label: "Linhas", value: diagnostic.summary.records_count },
           { label: "Valor identificado", value: formatCurrency(diagnostic.summary.total_amount) },
           { label: "Alertas", value: diagnostic.summary.alerts_count },
           { label: "Status", value: statusLabel },
@@ -154,7 +154,7 @@ export default function UploadDiagnosticPage() {
         ))}
         <AttentionPointCard
           title="Leitura cautelosa"
-          body="Sem vínculo factual encontrado não é conclusão sobre o caso. É sinal de que faltam chaves no arquivo ou bases complementares para ligação automática."
+          body="Sem ligação automática encontrada não é conclusão sobre o caso. É sinal de que faltam dados no arquivo ou bases complementares para ligação automática."
           tone="info"
         />
       </section>
@@ -162,7 +162,7 @@ export default function UploadDiagnosticPage() {
       <SupportRecordsTable records={diagnostic.support_records} />
 
       <section className="invest-card p-5 sm:p-6">
-        <p className="invest-section-title">Qualidade das chaves do arquivo</p>
+        <p className="invest-section-title">Dados que ajudam a ligar informações</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {qualityItems.map((item) => (
             <div key={item.label} className="invest-card-solid p-4">

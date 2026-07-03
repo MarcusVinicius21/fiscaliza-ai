@@ -32,6 +32,7 @@ const navGroups = [
       { href: "/dashboard", label: "Dashboard", description: "Visao geral", icon: "dashboard" },
       { href: "/uploads", label: "Uploads", description: "Importar dados", icon: "upload" },
       { href: "/search", label: "Busca", description: "Pessoas e fornecedores", icon: "search" },
+      { href: "/fornecedores", label: "Fornecedores", description: "Quem aparece", icon: "search" },
       { href: "/investigacoes", label: "Investigacoes", description: "Pessoas e fornecedores", icon: "investigation" },
       { href: "/records", label: "Linhas", description: "Base carregada", icon: "records" },
       { href: "/alerts", label: "Alertas", description: "O que exige atencao", icon: "alerts" },

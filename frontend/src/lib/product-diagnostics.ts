@@ -191,7 +191,7 @@ export async function fetchUploadDiagnostic(uploadId: string): Promise<UploadDia
     .maybeSingle();
 
   if (uploadRes.error) throw new Error(uploadRes.error.message);
-  if (!uploadRes.data) throw new Error("Upload não encontrado.");
+  if (!uploadRes.data) throw new Error("Arquivo não encontrado.");
 
   const uploadRow = uploadRes.data as UploadRow;
   const city = Array.isArray(uploadRow.cities) ? uploadRow.cities[0] : uploadRow.cities;
@@ -288,7 +288,7 @@ export async function fetchUploadDiagnostic(uploadId: string): Promise<UploadDia
   if (bids.length === 0) {
     attentionPoints.push({
       title: "Licitações não carregadas neste recorte",
-      body: "Não há facts de licitação para este upload. A ausência de cadeia completa deve ser lida como limitação do acervo atual.",
+      body: "Não há licitações carregadas para este arquivo. As ligações ausentes devem ser lidas como limitação do acervo atual.",
     });
   }
   if (rankings.byAmount[0] && rankings.byAmount[0].amount > 0) {
@@ -300,7 +300,7 @@ export async function fetchUploadDiagnostic(uploadId: string): Promise<UploadDia
   if (alerts.length > 0) {
     attentionPoints.push({
       title: "Alertas relacionados",
-      body: "Há alertas associados ao upload. Eles indicam necessidade de revisão, não conclusão automática.",
+      body: "Há alertas associados ao arquivo. Eles indicam necessidade de revisão, não conclusão automática.",
     });
   }
 

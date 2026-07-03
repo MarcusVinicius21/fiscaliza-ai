@@ -22,6 +22,8 @@ interface SupplierAlert {
   severity?: string | null;
   amount?: number | null;
   created_at?: string | null;
+  link_source?: string | null;
+  link_label?: string | null;
 }
 
 interface SupplierOverviewPayload {
@@ -33,6 +35,13 @@ interface SupplierOverviewPayload {
     document?: string | null;
     source_confidence?: number | null;
     aliases: string[];
+    alias_details?: Array<{
+      alias_name?: string | null;
+      alias_type?: string | null;
+      source_upload_id?: string | null;
+      source_file_name?: string | null;
+      created_at?: string | null;
+    }>;
   };
   summary: {
     uploads_count: number;
@@ -76,6 +85,7 @@ interface SupplierOverviewPayload {
 interface SupplierRecord {
   record_id: string;
   upload_id: string;
+  city_id?: string | null;
   file_name?: string | null;
   category?: string | null;
   report_type?: string | null;
@@ -88,7 +98,7 @@ interface SupplierRecord {
   modalidade?: string | null;
   data?: string | null;
   summary: string;
-  alerts: Array<{ id: string; title: string; severity?: string | null }>;
+  alerts: Array<{ id: string; title: string; severity?: string | null; link_label?: string | null }>;
 }
 
 interface SupplierRecordsPayload {
@@ -183,6 +193,9 @@ export default function SupplierDetailPage() {
   const [recordsPage, setRecordsPage] = useState(1);
   const [selectedUpload, setSelectedUpload] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedCity, setSelectedCity] = useState("");
+  const [alertFilter, setAlertFilter] = useState("");
+  const [recordQuery, setRecordQuery] = useState("");
   const [spendFacts, setSpendFacts] = useState<SupplierSpendFacts>({ contracts: [], payments: [] });
   const [spendFactsError, setSpendFactsError] = useState("");
 
@@ -246,6 +259,10 @@ export default function SupplierDetailPage() {
         });
         if (selectedUpload) params.set("upload_id", selectedUpload);
         if (selectedCategory) params.set("category", selectedCategory);
+        if (selectedCity) params.set("city_id", selectedCity);
+        if (alertFilter === "with") params.set("has_alert", "true");
+        if (alertFilter === "without") params.set("has_alert", "false");
+        if (recordQuery.trim()) params.set("q", recordQuery.trim());
 
         const response = await fetch(`${API_BASE}/suppliers/${supplierId}/records?${params.toString()}`);
         const payload = (await response.json().catch(() => null)) as SupplierRecordsPayload | null;
@@ -279,11 +296,11 @@ export default function SupplierDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [supplierId, recordsPage, selectedUpload, selectedCategory]);
+  }, [supplierId, recordsPage, selectedUpload, selectedCategory, selectedCity, alertFilter, recordQuery]);
 
   useEffect(() => {
     setRecordsPage(1);
-  }, [selectedUpload, selectedCategory]);
+  }, [selectedUpload, selectedCategory, selectedCity, alertFilter, recordQuery]);
 
   useEffect(() => {
     let cancelled = false;
@@ -306,7 +323,7 @@ export default function SupplierDetailPage() {
 
       if (cancelled) return;
       if (contractsRes.error || paymentsRes.error) {
-        setSpendFactsError("Não foi possível carregar a cadeia factual deste fornecedor agora.");
+        setSpendFactsError("Não foi possível carregar os contratos e pagamentos deste fornecedor agora.");
         return;
       }
       setSpendFacts({
@@ -380,7 +397,7 @@ export default function SupplierDetailPage() {
               {overview.supplier.canonical_name}
             </h1>
             <p className="invest-subtitle mt-3 text-sm sm:text-base">
-              Histórico consolidado por entidade canônica, com linhas, uploads e alertas relacionados.
+              Histórico consolidado por fornecedor, com linhas, arquivos e alertas relacionados.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <StatusPill tone="info">
@@ -397,7 +414,7 @@ export default function SupplierDetailPage() {
             Voltar para busca
           </Link>
           <Link href={`/relatorios/fornecedor/${supplierId}`} className="invest-button px-4">
-            Abrir dossiê
+            Abrir relatório
           </Link>
         </div>
 
@@ -415,13 +432,65 @@ export default function SupplierDetailPage() {
       <section className="invest-card p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
+            <p className="invest-section-title">Nomes encontrados no arquivo</p>
+            <p className="mt-1 text-sm text-[var(--invest-muted)]">
+              Use estes nomes para conferir se o fornecedor aparece com grafias diferentes.
+            </p>
+          </div>
+          <StatusPill tone="info">Nome principal</StatusPill>
+        </div>
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          <article className="invest-card-solid p-4">
+            <p className="metric-label">Nome principal</p>
+            <p className="mt-2 text-sm font-black text-[var(--invest-heading)]">
+              {overview.supplier.canonical_name}
+            </p>
+            <p className="mt-1 text-xs text-[var(--invest-muted)]">
+              Documento encontrado: {formatDocument(overview.supplier.document)}
+            </p>
+          </article>
+
+          {(overview.supplier.alias_details || []).length > 0 ? (
+            overview.supplier.alias_details?.slice(0, 6).map((alias) => (
+              <article key={`${alias.alias_name}-${alias.source_upload_id}`} className="invest-card-solid p-4">
+                <p className="metric-label">Nome encontrado no arquivo</p>
+                <p className="mt-2 text-sm font-black text-[var(--invest-heading)]">
+                  {alias.alias_name || "nome não informado"}
+                </p>
+                <p className="mt-1 text-xs text-[var(--invest-muted)]">
+                  Arquivo de origem: {alias.source_file_name || "não informado"}
+                </p>
+              </article>
+            ))
+          ) : overview.supplier.aliases.length > 0 ? (
+            overview.supplier.aliases.slice(0, 6).map((alias) => (
+              <article key={alias} className="invest-card-solid p-4">
+                <p className="metric-label">Nome encontrado no arquivo</p>
+                <p className="mt-2 text-sm font-black text-[var(--invest-heading)]">{alias}</p>
+                <p className="mt-1 text-xs text-[var(--invest-muted)]">Arquivo de origem não informado.</p>
+              </article>
+            ))
+          ) : (
+            <article className="invest-card-solid p-4">
+              <p className="text-sm text-[var(--invest-muted)]">
+                Nenhum outro nome foi encontrado para este fornecedor.
+              </p>
+            </article>
+          )}
+        </div>
+      </section>
+
+      <section className="invest-card p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
             <p className="invest-section-title">Fornecedor 360</p>
             <p className="mt-1 text-sm text-[var(--invest-muted)]">
-              Leitura por facts materializados e registros relacionados, sem alterar a cadeia factual.
+              Leitura por contratos, pagamentos e linhas encontradas nos arquivos.
             </p>
           </div>
           <StatusPill tone={paymentsWithoutContract || contractsWithoutBid ? "warning" : "success"}>
-            {paymentsWithoutContract || contractsWithoutBid ? "requer análise humana" : "vínculos presentes"}
+            {paymentsWithoutContract || contractsWithoutBid ? "precisa de conferência" : "ligações encontradas"}
           </StatusPill>
         </div>
 
@@ -441,15 +510,15 @@ export default function SupplierDetailPage() {
               <article className="metric-card">
                 <p className="metric-label">Contratos / pagamentos</p>
                 <p className="metric-value mt-2">{contractVisualCount} / {paymentVisualCount}</p>
-                <p className="mt-1 text-xs text-[var(--invest-muted)]">registros factuais ou relacionados</p>
+                <p className="mt-1 text-xs text-[var(--invest-muted)]">itens encontrados nos arquivos</p>
               </article>
             </div>
 
             {paymentsWithoutContract || contractsWithoutBid || spendFacts.contracts.length === 0 ? (
               <div className="mt-5">
                 <AttentionPointCard
-                  title="Ausência de vínculo factual explicada"
-                  body="Quando não há fact real ou vínculo automático, a tela exibe registros relacionados como apoio visual. Isso não afirma vínculo factual com pagamento."
+                  title="Ligação automática não encontrada"
+                  body="Quando não há ligação automática, a tela mostra linhas relacionadas como informação de apoio. Isso não afirma ligação direta com pagamento."
                   tone="info"
                 />
               </div>
@@ -500,7 +569,7 @@ export default function SupplierDetailPage() {
                         {record.document || record.record_id.slice(0, 8)}
                       </p>
                       <p className="mt-1 text-xs text-[var(--invest-muted)]">
-                        Registro contratual encontrado na base carregada.
+                        Registro contratual encontrado no arquivo.
                       </p>
                       <p className="mt-1 line-clamp-2 text-xs text-[var(--invest-muted)]">
                         {record.summary || "resumo não informado"}
@@ -510,13 +579,13 @@ export default function SupplierDetailPage() {
                       <p className="text-sm font-black text-[var(--invest-heading)]">
                         {formatMoney(parseMoney(record.valor_bruto || 0))}
                       </p>
-                      <StatusPill tone="warning">sem vínculo factual com pagamento</StatusPill>
+                      <StatusPill tone="warning">sem pagamento ligado automaticamente</StatusPill>
                     </div>
                   </div>
                 </div>
               ))
             ) : (
-              <EmptyStateWithReason reason="Nenhum contrato factual ou registro contratual foi associado a este fornecedor no acervo atual." />
+              <EmptyStateWithReason reason="Nenhum contrato ou registro contratual foi associado a este fornecedor no acervo atual." />
             )}
           </div>
         </article>
@@ -572,7 +641,7 @@ export default function SupplierDetailPage() {
                 </div>
               ))
             ) : (
-              <EmptyStateWithReason reason="Nenhum pagamento factual ou registro financeiro foi associado a este fornecedor no acervo atual." />
+              <EmptyStateWithReason reason="Nenhum pagamento ou registro financeiro foi associado a este fornecedor no acervo atual." />
             )}
           </div>
         </article>
@@ -580,7 +649,7 @@ export default function SupplierDetailPage() {
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <article className="metric-card">
-          <p className="metric-label">Uploads</p>
+          <p className="metric-label">Arquivos</p>
           <p className="metric-value mt-2">{overview.summary.uploads_count}</p>
         </article>
         <article className="metric-card">
@@ -588,7 +657,7 @@ export default function SupplierDetailPage() {
           <p className="metric-value mt-2">{overview.summary.records_count}</p>
         </article>
         <article className="metric-card">
-          <p className="metric-label">Valor consolidado</p>
+          <p className="metric-label">Valor total encontrado</p>
           <p className="metric-value mt-2">{formatMoney(overview.summary.total_amount)}</p>
         </article>
         <article className="metric-card">
@@ -608,7 +677,7 @@ export default function SupplierDetailPage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="invest-section-title">Onde aparece</p>
-              <p className="mt-1 text-sm text-[var(--invest-muted)]">Consolidação por cidade.</p>
+              <p className="mt-1 text-sm text-[var(--invest-muted)]">Onde o fornecedor aparece por cidade.</p>
             </div>
             <StatusPill tone="muted">{overview.cities.length} cidade(s)</StatusPill>
           </div>
@@ -640,7 +709,7 @@ export default function SupplierDetailPage() {
             <div>
               <p className="invest-section-title">Categorias</p>
               <p className="mt-1 text-sm text-[var(--invest-muted)]">
-                Distribuição do fornecedor pelos tipos de base.
+                Distribuição do fornecedor pelos tipos de arquivo.
               </p>
             </div>
           </div>
@@ -711,7 +780,7 @@ export default function SupplierDetailPage() {
         <article className="invest-card p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="invest-section-title">Uploads relacionados</p>
+          <p className="invest-section-title">Arquivos relacionados</p>
               <p className="mt-1 text-sm text-[var(--invest-muted)]">
                 Arquivos onde este fornecedor apareceu.
               </p>
@@ -751,7 +820,7 @@ export default function SupplierDetailPage() {
           <div>
             <p className="invest-section-title">Alertas relacionados</p>
             <p className="mt-1 text-sm text-[var(--invest-muted)]">
-              Vínculos conservadores com base em upload, fornecedor e registro de origem.
+              Ligações conservadoras com base no arquivo, no fornecedor e na linha de origem.
             </p>
           </div>
           <StatusPill tone="muted">{alertItems.length} alerta(s)</StatusPill>
@@ -802,16 +871,16 @@ export default function SupplierDetailPage() {
       <section className="invest-card p-5 sm:p-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="invest-section-title">Registros relacionados</p>
+            <p className="invest-section-title">Linhas encontradas</p>
             <p className="mt-1 text-sm text-[var(--invest-muted)]">
-              Linhas ligadas a esta entidade canônica.
+              Linhas ligadas a este fornecedor.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-3">
             <div>
               <label className="invest-label" htmlFor="supplier-upload-filter">
-                Upload
+                Arquivo
               </label>
               <select
                 id="supplier-upload-filter"
@@ -846,6 +915,55 @@ export default function SupplierDetailPage() {
                 ))}
               </select>
             </div>
+
+            <div>
+              <label className="invest-label" htmlFor="supplier-city-filter">
+                Cidade
+              </label>
+              <select
+                id="supplier-city-filter"
+                className="invest-select min-w-[180px]"
+                value={selectedCity}
+                onChange={(event) => setSelectedCity(event.target.value)}
+              >
+                <option value="">Todas</option>
+                {overview.cities.map((city) => (
+                  <option key={city.city_id} value={city.city_id}>
+                    {city.city_name}
+                    {city.state ? `/${city.state}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="invest-label" htmlFor="supplier-alert-filter">
+                Alertas
+              </label>
+              <select
+                id="supplier-alert-filter"
+                className="invest-select min-w-[170px]"
+                value={alertFilter}
+                onChange={(event) => setAlertFilter(event.target.value)}
+              >
+                <option value="">Todas</option>
+                <option value="with">Com alerta</option>
+                <option value="without">Sem alerta</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="invest-label" htmlFor="supplier-record-query">
+                Buscar nas linhas
+              </label>
+              <input
+                id="supplier-record-query"
+                className="invest-input min-w-[220px]"
+                value={recordQuery}
+                onChange={(event) => setRecordQuery(event.target.value)}
+                placeholder="Resumo, documento ou arquivo"
+              />
+            </div>
           </div>
         </div>
 
@@ -864,12 +982,11 @@ export default function SupplierDetailPage() {
             <table className="invest-table min-w-[980px]">
               <thead>
                 <tr>
-                  <th>Upload</th>
+                  <th>Arquivo</th>
                   <th>Cidade</th>
+                  <th>Categoria</th>
                   <th>Documento</th>
                   <th>Valor</th>
-                  <th>Tipo</th>
-                  <th>Modalidade</th>
                   <th>Data</th>
                   <th>Resumo</th>
                   <th>Alertas</th>
@@ -878,8 +995,8 @@ export default function SupplierDetailPage() {
               <tbody>
                 {(recordsPayload?.items || []).length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="text-sm text-[var(--invest-muted)]">
-                      Nenhum registro encontrado para o filtro atual.
+                    <td colSpan={8} className="text-sm text-[var(--invest-muted)]">
+                      Nenhuma linha encontrada para o filtro atual.
                     </td>
                   </tr>
                 ) : (
@@ -890,10 +1007,9 @@ export default function SupplierDetailPage() {
                         {record.city_name || "-"}
                         {record.state ? `/${record.state}` : ""}
                       </td>
+                      <td>{record.category || "-"}</td>
                       <td>{record.document || "-"}</td>
                       <td className="whitespace-nowrap">{formatMoney(record.valor_bruto)}</td>
-                      <td>{record.tipo_ato || "-"}</td>
-                      <td>{record.modalidade || "-"}</td>
                       <td className="whitespace-nowrap">{record.data || "-"}</td>
                       <td className="max-w-[260px] text-sm leading-6">{record.summary}</td>
                       <td>
@@ -901,7 +1017,7 @@ export default function SupplierDetailPage() {
                           {record.alerts.length > 0 ? (
                             record.alerts.map((alert) => (
                               <Link key={alert.id} href={`/alerts/${alert.id}`} className="app-chip">
-                                {alert.title}
+                                {alert.link_label || "Precisa de conferência"}
                               </Link>
                             ))
                           ) : (
@@ -945,7 +1061,7 @@ export default function SupplierDetailPage() {
       <section className="invest-card p-5 sm:p-6">
         <details>
           <summary className="list-none text-sm font-black text-[var(--invest-heading)]">
-            Ver aliases deste fornecedor
+            Ver nomes encontrados no arquivo
           </summary>
           <div className="mt-4 flex flex-wrap gap-2">
             {overview.supplier.aliases.length > 0 ? (
@@ -955,7 +1071,7 @@ export default function SupplierDetailPage() {
                 </span>
               ))
             ) : (
-              <span className="app-chip">Nenhum alias registrado</span>
+              <span className="app-chip">Nenhum nome alternativo registrado</span>
             )}
           </div>
         </details>
