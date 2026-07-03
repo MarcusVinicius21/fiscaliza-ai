@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { StatusPill } from "@/components/app/status-pill";
 import { supabase } from "@/lib/supabase";
 
@@ -26,11 +26,7 @@ export default function CitiesPage() {
   const [portalUrl, setPortalUrl] = useState("");
   const [clientId, setClientId] = useState("");
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
 
     const { data: clientsData } = await supabase
@@ -48,7 +44,12 @@ export default function CitiesPage() {
     else setCities(citiesData || []);
 
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchData();
+  }, [fetchData]);
 
   const handleAddCity = async (e: React.FormEvent) => {
     e.preventDefault();

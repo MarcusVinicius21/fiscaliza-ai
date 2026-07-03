@@ -151,11 +151,9 @@ export function AppTopbar() {
   const { collapsed, toggle } = useSidebar();
   const { theme, mounted, toggleTheme } = useTheme();
   const isDark = theme === "dark";
-  const themeButtonLabel = mounted
-    ? isDark
-      ? "Ativar modo claro"
-      : "Ativar modo escuro"
-    : "Alternar tema";
+  // aria-label e title fixos para evitar hydration mismatch entre SSR e cliente.
+  // O icone ja usa `mounted` para renderizar neutro no primeiro frame.
+  const themeButtonLabel = "Alternar tema";
 
   return (
     <header className="sticky top-0 z-30 border-b border-[var(--invest-border)] bg-white/92 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8 xl:px-10">

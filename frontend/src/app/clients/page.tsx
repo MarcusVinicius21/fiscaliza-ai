@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { StatusPill } from "@/components/app/status-pill";
 import { supabase } from "@/lib/supabase";
 
@@ -18,11 +18,7 @@ export default function ClientsPage() {
   const [email, setEmail] = useState("");
   const [document, setDocument] = useState("");
 
-  useEffect(() => {
-    fetchClients();
-  }, []);
-
-  const fetchClients = async () => {
+  const fetchClients = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("clients")
@@ -35,7 +31,12 @@ export default function ClientsPage() {
       setClients(data || []);
     }
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchClients();
+  }, [fetchClients]);
 
   const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();

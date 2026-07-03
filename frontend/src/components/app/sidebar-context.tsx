@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -34,30 +35,30 @@ export function SidebarProvider({
   children: React.ReactNode;
   initialCollapsed: boolean;
 }) {
-  const [collapsed, setCollapsed] = useState(initialCollapsed);
+  const [collapsed, setCollapsed] = useState<boolean>(initialCollapsed);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    const resolvedCollapsed = stored === "true" ? true : stored === "false" ? false : initialCollapsed;
-    setCollapsed(resolvedCollapsed);
-    persistCollapsed(resolvedCollapsed);
+    const resolved = stored === "true" ? true : stored === "false" ? false : initialCollapsed;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCollapsed(resolved);
+    persistCollapsed(resolved);
   }, [initialCollapsed]);
 
-  function toggle() {
+  const toggle = useCallback(() => {
     setCollapsed((prev) => {
       const next = !prev;
       persistCollapsed(next);
       return next;
     });
-  }
+  }, []);
 
   const value = useMemo(
     () => ({
       collapsed,
       toggle,
     }),
-    [collapsed]
+    [collapsed, toggle]
   );
 
   return (

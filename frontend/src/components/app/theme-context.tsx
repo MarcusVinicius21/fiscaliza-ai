@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -75,23 +76,30 @@ export function ThemeProvider({
   const [theme, setThemeState] = useState<Theme>(initialTheme);
   const [mounted, setMounted] = useState(false);
 
+  // Resolve tema real do localStorage/preferencia do sistema apos a montagem.
   useEffect(() => {
-    const resolvedTheme = getResolvedTheme(initialTheme);
-    setThemeState(resolvedTheme);
-    applyTheme(resolvedTheme);
-    persistTheme(resolvedTheme);
+    const resolved = getResolvedTheme(initialTheme);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setThemeState(resolved);
+    applyTheme(resolved);
+    persistTheme(resolved);
     setMounted(true);
   }, [initialTheme]);
 
-  function setTheme(themeValue: Theme) {
+  const setTheme = useCallback((themeValue: Theme) => {
     setThemeState(themeValue);
     applyTheme(themeValue);
     persistTheme(themeValue);
-  }
+  }, []);
 
-  function toggleTheme() {
-    setTheme(theme === "dark" ? "light" : "dark");
-  }
+  const toggleTheme = useCallback(() => {
+    setThemeState((prev) => {
+      const next = prev === "dark" ? "light" : "dark";
+      applyTheme(next);
+      persistTheme(next);
+      return next;
+    });
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -100,7 +108,7 @@ export function ThemeProvider({
       toggleTheme,
       setTheme,
     }),
-    [theme, mounted]
+    [theme, mounted, toggleTheme, setTheme]
   );
 
   return (

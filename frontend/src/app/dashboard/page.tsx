@@ -226,12 +226,13 @@ function InfoHint({ text }: { text: string }) {
   useEffect(() => {
     if (!open) return;
 
-    position();
+    const raf = requestAnimationFrame(() => position());
 
     const handle = () => position();
     window.addEventListener("resize", handle);
     window.addEventListener("scroll", handle, true);
     return () => {
+      cancelAnimationFrame(raf);
       window.removeEventListener("resize", handle);
       window.removeEventListener("scroll", handle, true);
     };

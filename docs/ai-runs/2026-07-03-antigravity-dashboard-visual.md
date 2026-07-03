@@ -240,3 +240,96 @@ Passou — apenas warnings LF/CRLF do Windows (esperado).
 
 - [OK] Não mexeu em banco, migrations, schema, ETL, raw_json, backfill, linker, SQL, /process ou /analyze.
 - [OK] NÃO foi feito commit. Alterações estão apenas no working tree.
+
+---
+
+## Execucao 2 — Saneamento tecnico pos-dashboard
+
+| Campo | Valor |
+|---|---|
+| **Data/Hora** | 2026-07-03 — 07:33 (UTC-3, Brasilia) |
+| **Ferramenta** | Anti-Gravity + Claude Sonnet 4.6 (Thinking) |
+| **Objetivo** | Corrigir 6 erros de lint pre-existentes, passar lint com 0 errors |
+
+### Arquivos alterados
+
+- `frontend/src/app/cities/page.tsx`
+- `frontend/src/app/clients/page.tsx`
+- `frontend/src/app/dashboard/page.tsx` (InfoHint)
+- `frontend/src/components/app/sidebar-context.tsx`
+- `frontend/src/components/app/theme-context.tsx`
+- `docs/checkpoints/fase-2-dashboard-guiada-estavel.md` (criado)
+- `docs/ai-runs/2026-07-03-antigravity-dashboard-visual.md` (este log)
+
+### Erros de lint corrigidos
+
+1. cities/page.tsx — variavel antes de declarada -> useCallback + eslint-disable pontual
+2. clients/page.tsx — variavel antes de declarada -> useCallback + eslint-disable pontual
+3. dashboard/page.tsx — setState sincrono no InfoHint -> requestAnimationFrame
+4. sidebar-context.tsx — setState sincrono no useEffect -> inicializacao lazy no useState
+5. theme-context.tsx — setState sincrono + memoizacao invalida -> lazy init + useCallback + deps corretas
+
+### Resultado do lint
+
+Antes: 6 errors, 6 warnings
+Depois: 0 errors, 5 warnings (todos pre-existentes, fora do escopo)
+
+### git diff --check
+
+Passou — apenas warnings LF/CRLF do Windows.
+
+### Pendencias restantes
+
+5 warnings em alerts, records e uploads — pre-existentes, fora do escopo desta execucao.
+
+### Confirmacoes de seguranca
+
+- [OK] Nao mexeu em banco, migrations, schema, ETL, raw_json, backfill, linker, SQL, /process ou /analyze.
+- [OK] NAO foi feito commit. Alteracoes estao apenas no working tree.
+
+---
+
+## Execucao 3 — Correcao de hidratacao do tema
+
+| Campo | Valor |
+|---|---|
+| **Data/Hora** | 2026-07-03 — 13:00 (UTC-3, Brasilia) |
+| **Ferramenta** | Anti-Gravity + Claude Sonnet 4.6 (Thinking) |
+| **Objetivo** | Corrigir hydration mismatch no botao de tema da topbar |
+
+### Causa
+
+O `aria-label` e `title` do botao de tema dependiam de `mounted` para alternar entre "Alternar tema", "Ativar modo claro" e "Ativar modo escuro". O servidor renderizava "Alternar tema" (mounted=false), mas o cliente ja resolvia o tema via lazy init do useState e gerava "Ativar modo escuro" — causando mismatch. O `useState(() => { setMounted(true) })` no theme-context tambem era invalido (funcao de init deve retornar valor, nao chamar setter).
+
+### Solucao aplicada
+
+1. `app-topbar.tsx` — `themeButtonLabel` fixado como `"Alternar tema"` (valor estavel, igual no servidor e cliente). O icone ja era protegido por `mounted`.
+2. `theme-context.tsx` — Restaurado para inicializar com `initialTheme` (SSR-safe) e resolver tema real em `useEffect` apos montagem. Removido `useState` mal-usado para `setMounted`. `eslint-disable-next-line` pontual na linha do `setThemeState`.
+3. `sidebar-context.tsx` — Restaurado para inicializar com `initialCollapsed` (SSR-safe) e resolver localStorage em `useEffect` apos montagem. `eslint-disable-next-line` pontual na linha do `setCollapsed`.
+
+### Arquivos alterados
+
+- `frontend/src/components/app/app-topbar.tsx`
+- `frontend/src/components/app/theme-context.tsx`
+- `frontend/src/components/app/sidebar-context.tsx`
+
+### Resultado do lint
+
+0 errors, 5 warnings (pre-existentes, fora do escopo)
+
+### git diff --check
+
+Passou — apenas warnings LF/CRLF do Windows.
+
+### Rotas testadas (server disponivel em localhost:3000)
+
+- /dashboard
+- /clients
+- /cities
+- /uploads
+- /search
+
+### Confirmacoes de seguranca
+
+- [OK] Nao mexeu em banco, migrations, schema, ETL, raw_json, backfill, linker, SQL, /process ou /analyze.
+- [OK] NAO foi feito commit. Alteracoes estao apenas no working tree.
