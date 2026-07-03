@@ -652,6 +652,115 @@ html[data-theme="dark"] .invest-soft-scroll::-webkit-scrollbar-thumb {
   background: rgba(249, 249, 249, 0.22);
 }
 
+.fiscaliza-dashboard-page {
+  --invest-surface: #ffffff;
+  --invest-surface-soft: #f8fafc;
+  --invest-surface-elevated: #ffffff;
+  --invest-card: #ffffff;
+  --invest-card-soft: #f8fafc;
+  --invest-border: #e2e8f0;
+  --invest-border-strong: #cbd5e1;
+  --invest-heading: #0f172a;
+  --invest-text: #1f2937;
+  --invest-muted: #64748b;
+  --invest-faint: #94a3b8;
+  --invest-input-bg: #ffffff;
+  --invest-input-text: #0f172a;
+  --invest-input-border: #d8deea;
+  --invest-table-head: #f8fafc;
+  --invest-table-hover: #f8fbff;
+  --invest-chip-bg: #ffffff;
+  --invest-chip-text: #334155;
+}
+
+.fiscaliza-product-light {
+  color: #475569 !important;
+}
+
+.fiscaliza-product-light .text-slate-950,
+.fiscaliza-product-light .text-slate-900,
+.fiscaliza-product-light .text-orange-950 {
+  color: #0f172a !important;
+}
+
+.fiscaliza-product-light .text-slate-700,
+.fiscaliza-product-light .text-slate-600,
+.fiscaliza-product-light .text-slate-500,
+.fiscaliza-product-light .text-orange-900 {
+  color: #475569 !important;
+}
+
+.fiscaliza-product-light .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+.fiscaliza-product-light .text-blue-600,
+.fiscaliza-product-light .text-blue-700 {
+  color: #2563eb !important;
+}
+
+.fiscaliza-product-light .text-emerald-600,
+.fiscaliza-product-light .text-emerald-700 {
+  color: #059669 !important;
+}
+
+.fiscaliza-product-light .text-violet-600,
+.fiscaliza-product-light .text-violet-700 {
+  color: #7c3aed !important;
+}
+
+.fiscaliza-product-light .text-orange-600 {
+  color: #ea580c !important;
+}
+
+.fiscaliza-product-light .bg-white,
+.fiscaliza-product-light [class*="bg-white/"] {
+  background-color: rgba(255, 255, 255, 0.88) !important;
+}
+
+.fiscaliza-product-light .bg-blue-50 {
+  background-color: #eff6ff !important;
+}
+
+.fiscaliza-product-light .bg-emerald-50 {
+  background-color: #ecfdf5 !important;
+}
+
+.fiscaliza-product-light .bg-violet-50 {
+  background-color: #f5f3ff !important;
+}
+
+.fiscaliza-product-light .bg-orange-50 {
+  background-color: #fff7ed !important;
+}
+
+.fiscaliza-product-light .bg-blue-100 {
+  background-color: #dbeafe !important;
+}
+
+.fiscaliza-product-light .bg-orange-100 {
+  background-color: #ffedd5 !important;
+}
+
+.fiscaliza-sidebar-light {
+  --invest-surface: #ffffff;
+  --invest-surface-soft: #f8fafc;
+  --invest-border: #e2e8f0;
+  --invest-heading: #0f172a;
+  --invest-muted: #64748b;
+  --invest-faint: #94a3b8;
+  background: #ffffff !important;
+}
+
+.fiscaliza-sidebar-light .bg-blue-50,
+.fiscaliza-sidebar-light .hover\:bg-blue-50\/70:hover {
+  background-color: #eff6ff !important;
+}
+
+.fiscaliza-sidebar-light .text-blue-600 {
+  color: #2563eb !important;
+}
+
 @media print {
   html,
   body {

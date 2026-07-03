@@ -8,9 +8,21 @@ import {
   useRef,
   useState,
 } from "react";
+import Link from "next/link";
 import { StatusPill } from "@/components/app/status-pill";
 import { SkeletonBlock } from "@/components/app/skeleton-block";
+import {
+  DashboardActionCarousel,
+  GuidedDashboardHero,
+  GuidedInvestigationFlow,
+  InvestigationSuggestionCard,
+  ResponsibleReadingCards,
+  buildGuidedSteps,
+} from "@/components/product/guided-dashboard";
+import type { DashboardSupplier } from "@/components/product/guided-dashboard";
 import { supabase } from "@/lib/supabase";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
 interface UploadRecord {
   id: string;
@@ -46,6 +58,12 @@ interface AnalysisLog {
   input_summary?: string | Record<string, unknown> | null;
   ai_output?: string | Record<string, unknown> | null;
   created_at?: string | null;
+}
+
+interface SupplierDirectoryPayload {
+  status: string;
+  suppliers?: DashboardSupplier[];
+  count?: number;
 }
 
 type StatusTone = "info" | "danger" | "success" | "muted" | "warning";
@@ -329,12 +347,37 @@ export default function DashboardPage() {
   const [alerts, setAlerts] = useState<AlertRecord[]>([]);
   const [logs, setLogs] = useState<AnalysisLog[]>([]);
   const [selectedUploadId, setSelectedUploadId] = useState("");
+  const [topSupplier, setTopSupplier] = useState<DashboardSupplier | null>(null);
+  const [supplierError, setSupplierError] = useState("");
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     fetchDashboardData();
+    fetchTopSupplier();
   }, []);
+
+  async function fetchTopSupplier() {
+    setSupplierError("");
+
+    try {
+      const response = await fetch(`${API_BASE}/suppliers?limit=1`);
+      const payload = (await response.json().catch(() => null)) as SupplierDirectoryPayload | null;
+
+      if (!response.ok) {
+        throw new Error("Nao foi possivel carregar os fornecedores agora.");
+      }
+
+      setTopSupplier(payload?.suppliers?.[0] || null);
+    } catch (error) {
+      setTopSupplier(null);
+      setSupplierError(
+        error instanceof Error
+          ? error.message
+          : "Nao foi possivel carregar os fornecedores agora."
+      );
+    }
+  }
 
   async function fetchDashboardData() {
     setLoading(true);
@@ -506,7 +549,7 @@ export default function DashboardPage() {
     textOrEmpty(primaryInsight?.["headline"]) ||
     textOrEmpty(blocosExecutivos["o_que_aconteceu"]) ||
     primaryAlert?.title ||
-    "Nenhum alerta encontrado neste upload";
+    "Nenhum alerta encontrado neste arquivo";
   const primarySubheadline =
     textOrEmpty(primaryInsight?.["headline"]) ||
     textOrEmpty(primaryInsight?.["subheadline"]) ||
@@ -518,7 +561,7 @@ export default function DashboardPage() {
     textOrEmpty(blocosExecutivos["traducao_do_valor"]) ||
     textOrEmpty(blocosExecutivos["quanto_custa"]) ||
     (primaryShare > 0
-      ? `${formatPercent(primaryShare)} do valor analisado no upload.`
+      ? `${formatPercent(primaryShare)} do valor analisado neste arquivo.`
       : "Peso no total ainda não calculado.");
   const primaryConcern =
     textOrEmpty(primaryInsight?.["por_que_preocupa"]) ||
@@ -560,6 +603,26 @@ export default function DashboardPage() {
         : [];
   const visibleAlertCount =
     selectedAlerts.length > 0 ? selectedAlerts.length : visibleAlerts.length;
+  const bestUpload = selectedUpload || uploadsAnalisados[0] || null;
+  const uploadDiagnosticHref = bestUpload
+    ? `/uploads/${bestUpload.id}/diagnostico`
+    : undefined;
+  const topSupplierHref = topSupplier ? `/fornecedores/${topSupplier.id}` : undefined;
+  const topSupplierReportHref = topSupplier
+    ? `/relatorios/fornecedor/${topSupplier.id}`
+    : undefined;
+  const guidedSteps = buildGuidedSteps({
+    uploadDiagnosticHref,
+    topSupplierHref,
+    topSupplierReportHref,
+  });
+  const bestUploadMeta = bestUpload
+    ? `${categoryLabel(bestUpload.category)} - ${bestUpload.report_type || "sem tipo"} - ${
+        bestUpload.cities?.name
+          ? `${bestUpload.cities.name}/${bestUpload.cities.state}`
+          : "cidade nao informada"
+      } - ${formatDate(bestUpload.created_at)}`
+    : undefined;
 
   if (loading) {
     return (
@@ -576,21 +639,51 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="page-shell">
-      <section className="page-header p-5 md:p-6">
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+    <div className="page-shell fiscaliza-dashboard-page">
+      <GuidedDashboardHero
+        uploadName={bestUpload?.file_name}
+        uploadMeta={bestUploadMeta}
+        uploadHref={uploadDiagnosticHref}
+        reportHref={topSupplierReportHref}
+      />
+
+      <DashboardActionCarousel
+        uploadHref={uploadDiagnosticHref}
+        supplierHref="/search?type=supplier"
+        reportHref={topSupplierReportHref}
+      />
+
+      {errorMessage && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {errorMessage}
+        </div>
+      )}
+
+      <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_16px_42px_rgba(15,23,42,0.06)] sm:p-6">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div>
-            <p className="invest-eyebrow">Painel principal</p>
-            <h1 className="invest-title mt-2 max-w-3xl text-xl leading-tight md:text-[2rem]">
-              O que exige explicação agora.
-            </h1>
-            <p className="invest-subtitle mt-3 max-w-2xl text-sm">
-              Comece pelo maior sinal de atenção do arquivo. O painel usa a
-              análise já pronta e mantém vínculo com a origem.
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-600">
+              Comece por aqui
             </p>
+            <h2 className="mt-2 text-xl font-black text-slate-950">
+              Escolha um arquivo para ver os detalhes.
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              A tela mostra os arquivos ja analisados. Se quiser comecar do zero, abra a area de arquivos.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Link href="/uploads" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5">
+                Ver arquivos
+              </Link>
+              {uploadDiagnosticHref ? (
+                <Link href={uploadDiagnosticHref} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-black text-blue-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-50">
+                  Ver resumo do arquivo
+                </Link>
+              ) : null}
+            </div>
           </div>
 
-          <div className="rounded-lg border border-[var(--invest-border)] bg-white p-4 shadow-[var(--invest-shadow-soft)]">
+          <div>
             <label className="invest-label">Arquivo analisado</label>
             <select
               value={selectedUploadId}
@@ -599,8 +692,8 @@ export default function DashboardPage() {
             >
               <option value="">
                 {uploadsAnalisados.length === 0
-                  ? "Nenhum upload analisado"
-                  : "Selecione um upload para ver a análise"}
+                  ? "Nenhum arquivo analisado"
+                  : "Selecione um arquivo"}
               </option>
 
               {uploadsAnalisados.map((upload) => (
@@ -611,18 +704,18 @@ export default function DashboardPage() {
               ))}
             </select>
 
-            {selectedUpload && (
-              <div className="mt-3 rounded-lg border border-[var(--invest-border)] bg-[#fbfcff] p-3 text-sm text-[var(--invest-muted)]">
-                <p className="font-bold text-[var(--invest-heading)]">
-                  {selectedUpload.file_name}
+            {bestUpload && (
+              <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50/60 p-3 text-sm text-slate-600">
+                <p className="font-bold text-slate-950">
+                  {bestUpload.file_name}
                 </p>
                 <p className="mt-2">
-                  {categoryLabel(selectedUpload.category)} ·{" "}
-                  {selectedUpload.report_type || "sem tipo"} ·{" "}
-                  {selectedUpload.cities?.name
-                    ? `${selectedUpload.cities.name}/${selectedUpload.cities.state}`
-                    : "cidade não informada"}{" "}
-                  · {formatDate(selectedUpload.created_at)}
+                  {categoryLabel(bestUpload.category)} -{" "}
+                  {bestUpload.report_type || "sem tipo"} -{" "}
+                  {bestUpload.cities?.name
+                    ? `${bestUpload.cities.name}/${bestUpload.cities.state}`
+                    : "cidade nao informada"}{" "}
+                  - {formatDate(bestUpload.created_at)}
                 </p>
               </div>
             )}
@@ -630,70 +723,74 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {errorMessage && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {errorMessage}
-        </div>
-      )}
+      <GuidedInvestigationFlow steps={guidedSteps} />
 
-      <ChapterHeader label="Bloco 1" title="Visão rápida" />
+      <InvestigationSuggestionCard
+        supplier={topSupplier}
+        uploadHref={uploadDiagnosticHref}
+        supplierError={supplierError}
+      />
+
+      <ChapterHeader label="Visao rapida" title="Numeros atuais" />
       <section className="grid grid-cols-1 gap-3 md:grid-cols-4">
         <MetricCard
           label="Cidades"
           value={cityCount}
-          help="Quantidade de cidades cadastradas para receber arquivos e análises."
+          help="Quantidade de cidades cadastradas para receber arquivos."
         />
         <MetricCard
-          label="Uploads processados"
+          label="Arquivos lidos"
           value={uploadsProcessados.length}
-          help="Arquivos que já passaram pelo tratamento inicial. Isso ainda não significa que a análise de alertas foi rodada."
+          help="Arquivos que ja foram lidos pelo sistema."
         />
         <MetricCard
-          label="Uploads analisados"
+          label="Arquivos analisados"
           value={uploadsAnalisados.length}
-          help="Arquivos que já tiveram a leitura matemática e a interpretação automática concluídas."
+          help="Arquivos que ja tem resumo, valores e pontos de atencao."
         />
         <MetricCard
-          label="Alertas gerados"
+          label="Pontos de atencao"
           value={alerts.length}
-          help="Total de sinais salvos para consulta. Um alerta indica ponto de atenção, não conclusão de irregularidade."
+          help="Sinais salvos para ajudar na conferencia. Um alerta nao e conclusao."
         />
       </section>
+
+      <ResponsibleReadingCards />
 
       {!selectedUpload ? (
         uploadsAnalisados.length === 0 ? (
           <div className="rounded-lg border border-orange-200 bg-orange-50 p-5 text-sm text-orange-800">
-            Ainda não existe upload analisado. Rode a Etapa 5 em pelo menos um
-            arquivo para liberar o painel.
+            Ainda não existe arquivo analisado. Analise pelo menos um arquivo
+            para liberar o painel.
           </div>
         ) : (
           <section className="rounded-lg border border-[var(--invest-border)] bg-white p-6 shadow-[var(--invest-shadow-soft)]">
             <p className="invest-eyebrow">Seleção necessária</p>
             <h2 className="mt-2 text-lg font-black text-[var(--invest-heading)]">
-              Escolha um upload para abrir a análise
+              Escolha um arquivo para abrir a analise
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--invest-muted)]">
               A dashboard mostra apenas resultados já salvos. Nada é
               recalculado ou reanalisado automaticamente. Selecione um arquivo
               no seletor acima para ver os alertas, resumos e tabelas daquele
-              upload.
+              arquivo.
             </p>
             <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-[var(--invest-faint)]">
               {uploadsAnalisados.length}{" "}
               {uploadsAnalisados.length === 1
-                ? "upload analisado disponível"
-                : "uploads analisados disponíveis"}
+                ? "arquivo analisado disponivel"
+                : "arquivos analisados disponiveis"}
             </p>
           </section>
         )
       ) : (
         <>
-          <ChapterHeader label="Bloco 2" title="Principal sinal do arquivo" />
+          <ChapterHeader label="Detalhes" title="Principal ponto de atencao do arquivo" />
           <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
             <article className="insight-card p-5">
               <div className="flex items-start justify-between gap-3">
                 <p className="invest-eyebrow">Principal alerta do arquivo</p>
-                <InfoHint text="É o sinal mais importante do arquivo selecionado, usando a análise já salva. Pode vir da tabela de alertas ou do insight principal da IA." />
+                <InfoHint text="E o ponto mais importante do arquivo selecionado, usando a leitura ja salva. Pode vir da lista de alertas ou do resumo principal." />
               </div>
               <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_210px]">
                 <div>
@@ -704,7 +801,7 @@ export default function DashboardPage() {
                     {primarySubheadline}
                   </p>
                   <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm leading-6 text-orange-950">
-                    <p className="font-black">Por que isso preocupa</p>
+                    <p className="font-black">Por que merece atencao</p>
                     <p className="mt-1">{primaryConcern}</p>
                     {nextQuestion && (
                       <p className="mt-3 font-black">
@@ -721,8 +818,8 @@ export default function DashboardPage() {
 
                 <div className="rounded-lg border border-[var(--invest-border)] bg-white p-3">
                   <div className="flex items-start justify-between gap-3">
-                    <p className="metric-label">Quanto isso custa</p>
-                    <InfoHint text="Mostra o valor principal do alerta. O painel prioriza valor salvo no alerta e, se faltar, usa o valor numérico explícito do insight." />
+                    <p className="metric-label">Valor encontrado</p>
+                    <InfoHint text="Mostra o valor principal do alerta. Se faltar valor no alerta, o painel usa o valor salvo no resumo do arquivo." />
                   </div>
                   <p className="invest-number mt-3 text-2xl font-black text-[var(--invest-heading)]">
                     {formatMoney(primaryAlertAmount)}
@@ -744,8 +841,8 @@ export default function DashboardPage() {
             <aside className="rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)]">
               <SectionTitle
                 eyebrow="Resumo do problema"
-                title="Leitura curta da IA"
-                help="Texto de apoio gerado a partir da análise do arquivo. Ele resume o motivo de atenção sem substituir a prova."
+                title="Resumo curto"
+                help="Texto de apoio gerado a partir da leitura do arquivo. Ele resume o motivo de atencao sem substituir a conferencia."
               />
               <p className="mt-4 text-sm leading-7 text-[var(--invest-muted)]">
                 {resumoContextualIa || resumoInterpretativo || "Resumo indisponível."}
@@ -767,7 +864,7 @@ export default function DashboardPage() {
             <MetricCard
               label="Alertas deste arquivo"
               value={visibleAlertCount}
-              help="Sinais vinculados ao upload selecionado. Eles ajudam a priorizar apuração, sem afirmar culpa."
+              help="Sinais ligados ao arquivo selecionado. Eles ajudam a priorizar conferencia, sem afirmar culpa."
             />
             <MetricCard
               label="Linhas repetidas desconsideradas"
@@ -776,11 +873,11 @@ export default function DashboardPage() {
             />
           </section>
 
-          <ChapterHeader label="Bloco 3" title="Leitura do arquivo" />
+          <ChapterHeader label="Detalhes" title="Leitura do arquivo" />
           <section className="grid grid-cols-1 gap-4 xl:grid-cols-[0.95fr_1.05fr]">
             <div className="rounded-lg border border-[var(--invest-border)] bg-white p-5 shadow-[var(--invest-shadow-soft)]">
               <SectionTitle
-                eyebrow="Resumo técnico"
+                eyebrow="Resumo do arquivo"
                 title="O que a análise registrou"
                 help="Mostra a leitura resumida do arquivo e contagens de apoio. As quantidades aqui são de linhas analisadas."
               />
@@ -790,7 +887,7 @@ export default function DashboardPage() {
                   <div className="rounded-lg border border-[var(--invest-border)] bg-[#fbfcff] p-3">
                     <div className="flex items-start justify-between gap-3">
                       <p className="metric-label">Categoria do arquivo</p>
-                      <InfoHint text="Tipo de base informado no upload. Ele orienta a leitura do arquivo, mas não muda os dados brutos preservados." />
+                      <InfoHint text="Tipo de base informado no arquivo. Ele orienta a leitura sem mudar os dados enviados." />
                     </div>
                     <p className="mt-1 font-black text-[var(--invest-heading)]">
                       {categoryLabel(selectedUpload.category)}
@@ -858,8 +955,8 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          <ChapterHeader label="Bloco 4" title="Agrupamentos e maiores linhas" />
-          <ChapterHeader label="Bloco 5" title="Alertas e tipo de documento" />
+          <ChapterHeader label="Tabelas" title="Agrupamentos e maiores linhas" />
+          <ChapterHeader label="Alertas" title="Pontos de atencao e tipo de documento" />
           <section className="grid grid-cols-1 gap-4 xl:grid-cols-[0.85fr_1.15fr]">
             <div className="overflow-hidden rounded-lg border border-[var(--invest-border)] bg-white shadow-[var(--invest-shadow-soft)]">
               <div className="border-b border-[var(--invest-border)] p-5">
@@ -977,7 +1074,7 @@ export default function DashboardPage() {
                 <SectionTitle
                   eyebrow="Alertas"
                   title="Sinais deste arquivo"
-                  help="Lista os alertas vinculados ao upload selecionado. Se ainda não houver alerta salvo, o painel pode mostrar o insight principal como fallback visual."
+                  help="Lista os alertas ligados ao arquivo selecionado. Se ainda nao houver alerta salvo, o painel pode mostrar o principal ponto de atencao como apoio visual."
                 />
               </div>
               <div className="divide-y divide-[var(--invest-border)]">
@@ -1007,7 +1104,7 @@ export default function DashboardPage() {
                 ))}
                 {visibleAlerts.length === 0 && (
                   <p className="p-5 text-sm text-[var(--invest-muted)]">
-                    Nenhum alerta encontrado para este upload.
+                    Nenhum alerta encontrado para este arquivo.
                   </p>
                 )}
               </div>

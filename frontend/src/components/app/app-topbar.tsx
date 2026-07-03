@@ -16,31 +16,31 @@ const pageMeta: Record<string, { title: string; note: string }> = {
   },
   search: {
     title: "Busca",
-    note: "Procure fornecedores, pessoas, aliases e documentos.",
+    note: "Procure fornecedores, pessoas e documentos.",
   },
   investigacoes: {
     title: "Investigacoes",
-    note: "Cruze sinais tecnicos sem transformar hipotese em prova.",
+    note: "Veja relacoes que merecem conferencia.",
   },
   contratos: {
     title: "Contratos",
-    note: "Siga o contrato, a licitacao de origem e os pagamentos vinculados.",
+    note: "Veja contratos e pagamentos relacionados.",
   },
   licitacoes: {
     title: "Licitacoes",
-    note: "Entenda a origem factual das contratacoes.",
+    note: "Veja licitacoes carregadas e valores relacionados.",
   },
   pagamentos: {
     title: "Pagamentos",
-    note: "Veja a execucao financeira e o contrato ligado.",
+    note: "Veja pagamentos e contratos relacionados.",
   },
   pessoas: {
     title: "Pessoa",
-    note: "Veja aparicoes, papeis e cruzamentos desta entidade.",
+    note: "Veja onde esta pessoa aparece.",
   },
   records: {
     title: "Linhas",
-    note: "Consulte os registros carregados e seus vinculos com alertas.",
+    note: "Consulte as linhas carregadas e os alertas relacionados.",
   },
   alerts: {
     title: "Alertas",
@@ -48,7 +48,7 @@ const pageMeta: Record<string, { title: string; note: string }> = {
   },
   creatives: {
     title: "Artes",
-    note: "Comunique achados com rastreabilidade.",
+    note: "Crie pecas para comunicar com cuidado.",
   },
   clients: {
     title: "Clientes",
@@ -60,7 +60,7 @@ const pageMeta: Record<string, { title: string; note: string }> = {
   },
   fornecedores: {
     title: "Fornecedor",
-    note: "Veja o historico consolidado desta entidade.",
+    note: "Veja onde este fornecedor aparece.",
   },
 };
 
@@ -209,7 +209,7 @@ export function AppTopbar() {
             </div>
             <div>
               <p className="text-sm font-bold text-[var(--invest-heading)]">
-                Usuario tecnico
+                Usuario local
               </p>
               <p className="text-xs text-[var(--invest-muted)]">Sessao local</p>
             </div>
