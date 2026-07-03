@@ -182,7 +182,7 @@ export default function InvestigationsPage() {
             Investigações transversais
           </h1>
           <p className="invest-subtitle mt-3 text-sm sm:text-base">
-            Cruzamentos técnicos entre pessoas, servidores e fornecedores — apenas para orientar apuração humana. Nome parecido, sozinho, não vira prova aqui.
+            Possíveis ligações entre pessoas, servidores e fornecedores — apenas para orientar conferência. Nome parecido, sozinho, não confirma nada.
           </p>
         </div>
       </section>
@@ -208,7 +208,7 @@ export default function InvestigationsPage() {
 
           <div>
             <label className="invest-label" htmlFor="investigations-type">
-              Tipo de match de nome
+              Tipo de nome parecido
             </label>
             <select
               id="investigations-type"
@@ -217,8 +217,8 @@ export default function InvestigationsPage() {
               onChange={(event) => setCrossRefType(event.target.value)}
             >
               <option value="">Todos</option>
-              <option value="same_person_candidate">Candidato a mesma pessoa</option>
-              <option value="homonym_candidate">Homônimo</option>
+              <option value="same_person_candidate">Pode ser a mesma pessoa</option>
+              <option value="homonym_candidate">Nome parecido</option>
             </select>
           </div>
 
@@ -247,9 +247,9 @@ export default function InvestigationsPage() {
       <section className="invest-card p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="invest-section-title">Conflitos servidor × fornecedor</p>
+            <p className="invest-section-title">Servidor e fornecedor no mesmo caminho</p>
             <p className="mt-1 text-sm text-[var(--invest-muted)]">
-              Casos em que a mesma pessoa aparece como servidor e também ligada a fornecedor. Cada item precisa de checagem humana.
+              Casos em que a mesma pessoa aparece como servidor e também ligada a fornecedor. Cada item precisa de conferência.
             </p>
           </div>
           <StatusPill tone="warning">{linksPayload?.total || 0} item(ns)</StatusPill>
@@ -262,7 +262,7 @@ export default function InvestigationsPage() {
             <p className="text-sm font-bold text-[var(--invest-danger)]">{linksError}</p>
           ) : !linksPayload || linksPayload.items.length === 0 ? (
             <p className="text-sm text-[var(--invest-muted)]">
-              Ainda não há evidência suficiente nesta base para mostrar conflitos de papel confiáveis. Isso é bom sinal — mas tente trocar os filtros acima antes de concluir.
+              Ainda não há informação suficiente nesta base para mostrar papéis diferentes. Tente trocar os filtros antes de concluir.
             </p>
           ) : (
             linksPayload.items.map((item) => <CrossRefCard key={item.id} item={item} />)
@@ -273,9 +273,9 @@ export default function InvestigationsPage() {
       <section className="invest-card p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="invest-section-title">Homônimos e matches de nome</p>
+            <p className="invest-section-title">Nomes parecidos</p>
             <p className="mt-1 text-sm text-[var(--invest-muted)]">
-              Nome repetido não é prova. Ele apenas acende uma luz para apuração humana e checagem de documento.
+              Nome repetido não confirma nada sozinho. Ele apenas ajuda a orientar a conferência do documento.
             </p>
           </div>
           <StatusPill tone="muted">{namesPayload?.total || 0} item(ns)</StatusPill>
@@ -288,7 +288,7 @@ export default function InvestigationsPage() {
             <p className="text-sm font-bold text-[var(--invest-danger)]">{namesError}</p>
           ) : !namesPayload || namesPayload.items.length === 0 ? (
             <p className="text-sm text-[var(--invest-muted)]">
-              Nenhum homônimo ou candidato a mesma pessoa com os filtros atuais. Solte a confiança ou troque o tipo de match para ampliar a busca.
+              Nenhum nome parecido com os filtros atuais. Troque os filtros para ampliar a busca.
             </p>
           ) : (
             namesPayload.items.map((item) => <CrossRefCard key={item.id} item={item} />)

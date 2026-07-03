@@ -410,3 +410,81 @@ Passou — apenas warnings LF/CRLF do Windows.
 
 - [OK] Nao mexeu em banco, migrations, schema, ETL, raw_json, backfill, linker, SQL, /process ou /analyze.
 - [OK] NAO foi feito commit. Alteracoes estao apenas no working tree.
+
+---
+
+## Execução 5 — B2/B3/C0 e planos D/E/F/G
+
+| Campo | Valor |
+|---|---|
+| **Data** | 2026-07-03 |
+| **Ferramenta** | Codex |
+| **Objetivo** | Fortalecer aliases, possíveis duplicidades, origem de alertas e base read-only de pessoas/servidores, documentando planos futuros sem mexer no motor |
+
+### Arquivos alterados/criados
+
+- `backend/app/routers/entities.py`
+- `frontend/src/app/fornecedores/[id]/page.tsx`
+- `frontend/src/app/relatorios/fornecedor/[id]/page.tsx`
+- `frontend/src/app/pessoas/page.tsx`
+- `frontend/src/app/pessoas/[id]/page.tsx`
+- `frontend/src/app/investigacoes/page.tsx`
+- `frontend/src/components/app/app-sidebar.tsx`
+- `frontend/src/components/app/cross-ref-card.tsx`
+- `docs/checkpoints/fase-2b2-b3-c0-estavel.md`
+- `docs/checkpoints/fase-2d-cadeia-gasto-pendencias.md`
+- `docs/checkpoints/fase-2e-cnpj-qsa-plano.md`
+- `docs/checkpoints/fase-2f-pncp-ceis-benchmark-plano.md`
+- `docs/checkpoints/fase-2g-modulos-especializados-plano.md`
+
+### B2 — fornecedores, aliases e possíveis duplicidades
+
+- Criado endpoint read-only `GET /suppliers/{entity_id}/possible-duplicates`.
+- Critérios conservadores: mesmo documento, mesmo nome, nome encontrado em comum, nome parecido com documento ausente.
+- Fornecedor 360 ganhou bloco "Possíveis duplicidades".
+- Nomes encontrados no arquivo passaram a exibir contagem de ocorrência quando disponível.
+- Não há merge automático nem escrita no banco.
+
+### B3 — alertas e rastreabilidade
+
+- Relatório do fornecedor passou a mostrar pontos de atenção ligados ao fornecedor e o motivo simples da ligação.
+- Cards compartilhados trocaram termos técnicos por linguagem de usuário final.
+- Mantida a regra: alerta por nome exige conferência.
+
+### C0 — pessoas e servidores
+
+- Criada rota `/pessoas` com busca read-only por nome/documento usando `/entities/search`.
+- Sidebar ganhou item "Pessoas".
+- `/pessoas/[id]` e `/investigacoes` receberam ajustes de linguagem.
+- Não foi criado endpoint novo de diretório geral de pessoas.
+
+### D0/E0/F0/G0 — apenas documentação
+
+- D0: pendências de licitações e cadeia do gasto.
+- E0: plano futuro de CNPJ/QSA.
+- F0: plano futuro de PNCP/CEIS/benchmark.
+- G0: plano futuro de módulos especializados.
+
+### Comandos executados
+
+- `git status --short`
+- `git status -sb`
+- `git log --oneline --decorate -12`
+- `npm.cmd run lint`
+- `git diff --check`
+- `py_compile` dos routers backend alterados/relacionados
+
+### Pendências
+
+- Possíveis duplicidades são indícios e precisam de conferência.
+- Página `/pessoas` depende de busca digitada; não lista todas as pessoas sem termo.
+- Não há deduplicação com revisão manual ainda.
+- Licitações seguem adiadas.
+- Sem CNPJ/QSA/PNCP/CEIS/benchmark real.
+
+### Confirmações de segurança
+
+- [OK] Não mexeu em banco, migrations, schema, ETL, raw_json, backfill, linker, SQL, /process ou /analyze.
+- [OK] Não alterou cálculos de contratos ou pagamentos.
+- [OK] Não integrou APIs externas.
+- [OK] NÃO foi feito commit.

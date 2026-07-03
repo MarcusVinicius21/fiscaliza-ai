@@ -34,8 +34,10 @@ from supabase import Client, ClientOptions, create_client
 
 try:
     from app.utils.normalization import normalize_document, normalize_name
+    from app.utils.cross_references import is_name_too_generic, name_family_signature
 except ModuleNotFoundError:
     from backend.app.utils.normalization import normalize_document, normalize_name
+    from backend.app.utils.cross_references import is_name_too_generic, name_family_signature
 
 load_dotenv()
 
@@ -568,6 +570,43 @@ def _compute_supplier_rank(current_entity_id: str) -> int | None:
         return None
 
 
+def _shared_uploads_count(left_entity_id: str, right_entity_id: str) -> int:
+    left_links = _fetch_links([left_entity_id])
+    right_links = _fetch_links([right_entity_id])
+    left_records = _fetch_records(sorted({str(link.get("standardized_record_id") or "") for link in left_links}))
+    right_records = _fetch_records(sorted({str(link.get("standardized_record_id") or "") for link in right_links}))
+    left_uploads = {str(record.get("upload_id") or "") for record in left_records.values() if record.get("upload_id")}
+    right_uploads = {str(record.get("upload_id") or "") for record in right_records.values() if record.get("upload_id")}
+    return len(left_uploads & right_uploads)
+
+
+def _duplicate_candidate_payload(
+    *,
+    entity: dict,
+    reason: str,
+    confidence_label: str,
+    shared_document: bool = False,
+    shared_normalized_name: bool = False,
+    shared_alias: bool = False,
+    shared_uploads_count: int = 0,
+    records_count: int = 0,
+) -> dict:
+    return {
+        "entity_id": entity.get("id"),
+        "canonical_name": entity.get("canonical_name"),
+        "document": entity.get("document"),
+        "reason": reason,
+        "confidence_label": confidence_label,
+        "evidence": {
+            "shared_document": shared_document,
+            "shared_normalized_name": shared_normalized_name,
+            "shared_alias": shared_alias,
+            "shared_uploads_count": shared_uploads_count,
+            "records_count": records_count,
+        },
+    }
+
+
 @router.get("/entities/search")
 def search_entities(
     q: str = Query(..., min_length=1),
@@ -754,6 +793,13 @@ def supplier_overview(entity_id: str):
                 timeline_groups[period]["total_amount"] += amount
 
         relative_rank = _compute_supplier_rank(entity_id)
+        alias_occurrences: dict[tuple[str, str], int] = defaultdict(int)
+        for alias in alias_rows:
+            alias_key = (
+                normalize_name(alias.get("alias_name")) or str(alias.get("alias_name") or "").strip(),
+                str(alias.get("source_upload_id") or ""),
+            )
+            alias_occurrences[alias_key] += 1
 
         return {
             "status": "success",
@@ -777,6 +823,13 @@ def supplier_overview(entity_id: str):
                             uploads.get(str(alias.get("source_upload_id") or ""), {}).get("file_name")
                             if alias.get("source_upload_id")
                             else None
+                        ),
+                        "occurrences_count": alias_occurrences.get(
+                            (
+                                normalize_name(alias.get("alias_name")) or str(alias.get("alias_name") or "").strip(),
+                                str(alias.get("source_upload_id") or ""),
+                            ),
+                            1,
                         ),
                         "created_at": alias.get("created_at"),
                     }
@@ -823,6 +876,118 @@ def supplier_overview(entity_id: str):
         }
     except UpstreamQueryError as error:
         _raise_upstream_http_error(error, "Falha temporária ao carregar os dados do fornecedor. Tente novamente.")
+
+
+@router.get("/suppliers/{entity_id}/possible-duplicates")
+def supplier_possible_duplicates(entity_id: str, limit: int = Query(10, ge=1, le=25)):
+    try:
+        bundle = _build_supplier_bundle(entity_id)
+        entity = bundle["entity"]
+        alias_rows = bundle["aliases"]
+        stats_map = _entity_stats([entity_id])
+        current_document = normalize_document(entity.get("document"))
+        current_name = normalize_name(entity.get("canonical_name"))
+        current_aliases = {
+            normalize_name(alias.get("alias_name"))
+            for alias in alias_rows
+            if normalize_name(alias.get("alias_name"))
+        }
+        current_aliases.add(current_name)
+        current_signature = None if is_name_too_generic(current_name) else name_family_signature(current_name)
+
+        response = _execute_with_retry(
+            lambda: supabase.table("entities")
+            .select("id, entity_type, canonical_name, document, normalized_name, source_confidence, created_at")
+            .in_("entity_type", list(SUPPLIER_TYPES))
+            .limit(500),
+            "entities",
+        )
+        rows = [row for row in (response.data or []) if str(row.get("id") or "") != entity_id]
+        candidate_ids = [str(row.get("id") or "") for row in rows if row.get("id")]
+        candidate_aliases = _fetch_aliases(candidate_ids)
+        candidate_stats = _entity_stats(candidate_ids)
+
+        items_by_id: dict[str, dict] = {}
+        for candidate in rows:
+            candidate_id = str(candidate.get("id") or "")
+            candidate_document = normalize_document(candidate.get("document"))
+            candidate_name = normalize_name(candidate.get("normalized_name") or candidate.get("canonical_name"))
+            alias_names = {
+                normalize_name(alias.get("alias_name"))
+                for alias in candidate_aliases.get(candidate_id, [])
+                if normalize_name(alias.get("alias_name"))
+            }
+            shared_uploads_count = _shared_uploads_count(entity_id, candidate_id)
+            records_count = int(candidate_stats.get(candidate_id, {}).get("records_count", 0))
+
+            payload: dict | None = None
+            if current_document and candidate_document and current_document == candidate_document:
+                payload = _duplicate_candidate_payload(
+                    entity=candidate,
+                    reason="Mesmo documento com nome diferente",
+                    confidence_label="provável",
+                    shared_document=True,
+                    shared_normalized_name=current_name == candidate_name,
+                    shared_alias=bool(current_aliases & alias_names),
+                    shared_uploads_count=shared_uploads_count,
+                    records_count=records_count,
+                )
+            elif current_name and candidate_name and current_name == candidate_name:
+                payload = _duplicate_candidate_payload(
+                    entity=candidate,
+                    reason="Mesmo nome com documento diferente ou ausente",
+                    confidence_label="indício",
+                    shared_normalized_name=True,
+                    shared_alias=bool(current_aliases & alias_names),
+                    shared_uploads_count=shared_uploads_count,
+                    records_count=records_count,
+                )
+            elif current_aliases and (candidate_name in current_aliases or bool(current_aliases & alias_names)):
+                payload = _duplicate_candidate_payload(
+                    entity=candidate,
+                    reason="Nome encontrado no arquivo coincide com outro fornecedor",
+                    confidence_label="indício",
+                    shared_alias=True,
+                    shared_uploads_count=shared_uploads_count,
+                    records_count=records_count,
+                )
+            elif not current_document and current_signature and name_family_signature(candidate_name) == current_signature:
+                payload = _duplicate_candidate_payload(
+                    entity=candidate,
+                    reason="Nome parecido e documento ausente",
+                    confidence_label="indício",
+                    shared_uploads_count=shared_uploads_count,
+                    records_count=records_count,
+                )
+
+            if payload:
+                items_by_id[candidate_id] = payload
+
+        items = sorted(
+            items_by_id.values(),
+            key=lambda item: (
+                1 if item.get("confidence_label") == "provável" else 0,
+                int((item.get("evidence") or {}).get("shared_uploads_count") or 0),
+                int((item.get("evidence") or {}).get("records_count") or 0),
+            ),
+            reverse=True,
+        )[:limit]
+
+        return {
+            "status": "ok",
+            "entity_id": entity_id,
+            "total": len(items),
+            "items": items,
+            "note": "Possíveis duplicidades são apenas indícios e precisam de conferência.",
+            "current_supplier": {
+                "id": entity_id,
+                "canonical_name": entity.get("canonical_name"),
+                "document": entity.get("document"),
+                "records_count": stats_map.get(entity_id, {}).get("records_count", 0),
+            },
+        }
+    except UpstreamQueryError as error:
+        _raise_upstream_http_error(error, "Falha temporária ao buscar possíveis duplicidades. Tente novamente.")
 
 
 @router.get("/suppliers/{entity_id}/records")

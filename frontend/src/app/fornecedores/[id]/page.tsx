@@ -40,6 +40,7 @@ interface SupplierOverviewPayload {
       alias_type?: string | null;
       source_upload_id?: string | null;
       source_file_name?: string | null;
+      occurrences_count?: number | null;
       created_at?: string | null;
     }>;
   };
@@ -107,6 +108,28 @@ interface SupplierRecordsPayload {
   page_size: number;
   total: number;
   items: SupplierRecord[];
+}
+
+interface PossibleDuplicateItem {
+  entity_id: string;
+  canonical_name?: string | null;
+  document?: string | null;
+  reason: string;
+  confidence_label: "provável" | "indício" | string;
+  evidence?: {
+    shared_document?: boolean;
+    shared_normalized_name?: boolean;
+    shared_alias?: boolean;
+    shared_uploads_count?: number;
+    records_count?: number;
+  };
+}
+
+interface PossibleDuplicatesPayload {
+  status: string;
+  total: number;
+  items: PossibleDuplicateItem[];
+  note?: string;
 }
 
 interface SupplierSpendFacts {
@@ -190,6 +213,9 @@ export default function SupplierDetailPage() {
   const [loadingRecords, setLoadingRecords] = useState(true);
   const [overviewError, setOverviewError] = useState("");
   const [recordsError, setRecordsError] = useState("");
+  const [duplicatesPayload, setDuplicatesPayload] = useState<PossibleDuplicatesPayload | null>(null);
+  const [loadingDuplicates, setLoadingDuplicates] = useState(true);
+  const [duplicatesError, setDuplicatesError] = useState("");
   const [recordsPage, setRecordsPage] = useState(1);
   const [selectedUpload, setSelectedUpload] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -238,6 +264,49 @@ export default function SupplierDetailPage() {
     }
 
     loadOverview();
+    return () => {
+      cancelled = true;
+    };
+  }, [supplierId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPossibleDuplicates() {
+      if (!supplierId) return;
+      setLoadingDuplicates(true);
+      setDuplicatesError("");
+
+      try {
+        const response = await fetch(`${API_BASE}/suppliers/${supplierId}/possible-duplicates?limit=8`);
+        const payload = (await response.json().catch(() => null)) as PossibleDuplicatesPayload | null;
+
+        if (!response.ok) {
+          throw new Error(
+            safeDetail(payload, "Não foi possível carregar possíveis duplicidades agora.")
+          );
+        }
+
+        if (!cancelled) {
+          setDuplicatesPayload(payload);
+        }
+      } catch (error: unknown) {
+        if (!cancelled) {
+          setDuplicatesError(
+            safeNetworkMessage(
+              error,
+              "Não foi possível carregar possíveis duplicidades agora. Tente novamente em instantes."
+            )
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingDuplicates(false);
+        }
+      }
+    }
+
+    loadPossibleDuplicates();
     return () => {
       cancelled = true;
     };
@@ -372,6 +441,7 @@ export default function SupplierDetailPage() {
   }
 
   const alertItems = overview.related_alerts || [];
+  const possibleDuplicates = duplicatesPayload?.items || [];
   const records = recordsPayload?.items || [];
   const contractRecords = records.filter(isContractRecord);
   const paymentRecords = records.filter(isPaymentRecord);
@@ -461,6 +531,9 @@ export default function SupplierDetailPage() {
                 <p className="mt-1 text-xs text-[var(--invest-muted)]">
                   Arquivo de origem: {alias.source_file_name || "não informado"}
                 </p>
+                <p className="mt-1 text-xs text-[var(--invest-muted)]">
+                  Apareceu {alias.occurrences_count || 1} vez(es) neste recorte.
+                </p>
               </article>
             ))
           ) : overview.supplier.aliases.length > 0 ? (
@@ -477,6 +550,66 @@ export default function SupplierDetailPage() {
                 Nenhum outro nome foi encontrado para este fornecedor.
               </p>
             </article>
+          )}
+        </div>
+      </section>
+
+      <section className="invest-card p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="invest-section-title">Possíveis duplicidades</p>
+            <p className="mt-1 text-sm text-[var(--invest-muted)]">
+              Encontramos nomes ou documentos parecidos que podem representar o mesmo fornecedor. Confira antes de concluir.
+            </p>
+          </div>
+          <StatusPill tone={possibleDuplicates.length > 0 ? "warning" : "success"}>
+            {possibleDuplicates.length > 0 ? "precisa de conferência" : "sem indício"}
+          </StatusPill>
+        </div>
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {loadingDuplicates ? (
+            <div className="lg:col-span-2">
+              <SkeletonBlock lines={4} />
+            </div>
+          ) : duplicatesError ? (
+            <p className="text-sm font-bold text-[var(--invest-danger)]">{duplicatesError}</p>
+          ) : possibleDuplicates.length === 0 ? (
+            <p className="text-sm text-[var(--invest-muted)]">
+              Nenhuma possível duplicidade encontrada com os dados atuais.
+            </p>
+          ) : (
+            possibleDuplicates.map((item) => (
+              <article key={item.entity_id} className="invest-card-highlight p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-[var(--invest-heading)]">
+                      {item.canonical_name || "Fornecedor sem nome"}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--invest-muted)]">
+                      {formatDocument(item.document)}
+                    </p>
+                  </div>
+                  <StatusPill tone={item.confidence_label === "provável" ? "warning" : "muted"}>
+                    {item.confidence_label || "indício"}
+                  </StatusPill>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-[var(--invest-muted)]">
+                  {item.reason}. Possível duplicidade — precisa de conferência.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {item.evidence?.shared_document ? <span className="app-chip">mesmo documento</span> : null}
+                  {item.evidence?.shared_alias ? <span className="app-chip">nome encontrado em comum</span> : null}
+                  {item.evidence?.shared_uploads_count ? (
+                    <span className="app-chip">{item.evidence.shared_uploads_count} arquivo(s) em comum</span>
+                  ) : null}
+                  <span className="app-chip">{item.evidence?.records_count || 0} linha(s)</span>
+                </div>
+                <Link href={`/fornecedores/${item.entity_id}`} className="invest-button-secondary mt-4 px-4">
+                  Abrir histórico
+                </Link>
+              </article>
+            ))
           )}
         </div>
       </section>

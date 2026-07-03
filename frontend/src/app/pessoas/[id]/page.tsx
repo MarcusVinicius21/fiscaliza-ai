@@ -353,7 +353,7 @@ export default function PersonDetailPage() {
               {overview.person.canonical_name}
             </h1>
             <p className="invest-subtitle mt-3 text-sm sm:text-base">
-              Consolidação por entidade canônica com papéis observados, aparições e cruzamentos técnicos que pedem apuração humana.
+              Histórico desta pessoa ou servidor nos arquivos analisados, com papéis observados e possíveis ligações que precisam de conferência.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <StatusPill tone={overview.person.entity_type === "server" ? "warning" : "info"}>
@@ -361,7 +361,7 @@ export default function PersonDetailPage() {
               </StatusPill>
               <span className="app-chip">{formatDocument(overview.person.document)}</span>
               <span className="app-chip">
-                {overview.cross_reference_summary.total} cruzamento(s)
+                {overview.cross_reference_summary.total} possível(is) ligação(ões)
               </span>
             </div>
           </div>
@@ -389,7 +389,7 @@ export default function PersonDetailPage() {
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         <article className="metric-card">
-          <p className="metric-label">Uploads</p>
+          <p className="metric-label">Arquivos</p>
           <p className="metric-value mt-2">{overview.summary.uploads_count}</p>
         </article>
         <article className="metric-card">
@@ -409,7 +409,7 @@ export default function PersonDetailPage() {
           <p className="metric-value mt-2">{formatMoney(overview.summary.total_amount)}</p>
         </article>
         <article className="metric-card">
-          <p className="metric-label">Conflitos</p>
+          <p className="metric-label">Papéis diferentes</p>
           <p className="metric-value mt-2">{overview.summary.conflicts_detected}</p>
         </article>
       </section>
@@ -420,7 +420,7 @@ export default function PersonDetailPage() {
             <div>
               <p className="invest-section-title">Papéis observados</p>
               <p className="mt-1 text-sm text-[var(--invest-muted)]">
-                O mesmo nome pode aparecer em bases e funções diferentes. Isso não é prova automática — só acende um sinal.
+                O mesmo nome pode aparecer em bases e funções diferentes. Isso não conclui nada sozinho; apenas orienta a conferência.
               </p>
             </div>
           </div>
@@ -441,7 +441,7 @@ export default function PersonDetailPage() {
 
           <div className="mt-6">
             <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
-              Resumo de cruzamentos
+              Resumo de possíveis ligações
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {Object.entries(overview.cross_reference_summary.totals_by_type).map(([key, value]) => (
@@ -497,9 +497,9 @@ export default function PersonDetailPage() {
         <article className="invest-card p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="invest-section-title">Conflitos de papel</p>
+              <p className="invest-section-title">Aparece com papéis diferentes</p>
               <p className="mt-1 text-sm text-[var(--invest-muted)]">
-                Quando a mesma pessoa aparece como servidor e também ligada a fornecedor. Cada item precisa de verificação humana antes de virar denúncia.
+                Quando a mesma pessoa aparece como servidor e também ligada a fornecedor. Cada item precisa de conferência antes de qualquer conclusão.
               </p>
             </div>
             <StatusPill tone="warning">{conflictItems.length} item(ns)</StatusPill>
@@ -512,7 +512,7 @@ export default function PersonDetailPage() {
               <p className="text-sm font-bold text-[var(--invest-danger)]">{crossRefsError}</p>
             ) : conflictItems.length === 0 ? (
               <p className="text-sm text-[var(--invest-muted)]">
-                Nenhum conflito de papel detectado para esta pessoa nos uploads analisados até aqui.
+                Nenhum caso de papéis diferentes encontrado para esta pessoa nos arquivos analisados até aqui.
               </p>
             ) : (
               conflictItems.map((item) => (
@@ -525,9 +525,9 @@ export default function PersonDetailPage() {
         <article className="invest-card p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="invest-section-title">Outros indícios e homônimos</p>
+              <p className="invest-section-title">Outros nomes parecidos</p>
               <p className="mt-1 text-sm text-[var(--invest-muted)]">
-                Nome repetido não é prova. Aqui ele apenas acende luz para verificação humana.
+                Nome repetido não confirma nada sozinho. Aqui ele apenas ajuda a orientar a conferência.
               </p>
             </div>
             <StatusPill tone="muted">{matchItems.length} item(ns)</StatusPill>
@@ -540,7 +540,7 @@ export default function PersonDetailPage() {
               <p className="text-sm font-bold text-[var(--invest-danger)]">{crossRefsError}</p>
             ) : matchItems.length === 0 ? (
               <p className="text-sm text-[var(--invest-muted)]">
-                Nenhum homônimo ou candidato a mesma pessoa apareceu com evidência suficiente até aqui.
+                Nenhum nome parecido apareceu com informação suficiente até aqui.
               </p>
             ) : (
               matchItems.map((item) => (
@@ -554,16 +554,16 @@ export default function PersonDetailPage() {
       <section className="invest-card p-5 sm:p-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="invest-section-title">Aparições em registros</p>
+            <p className="invest-section-title">Aparições nas linhas</p>
             <p className="mt-1 text-sm text-[var(--invest-muted)]">
-              Cada linha é um registro padronizado em que esta pessoa aparece, com o papel que ocupava.
+              Cada linha mostra onde esta pessoa aparece e qual papel foi encontrado no arquivo.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-3">
             <div>
               <label className="invest-label" htmlFor="person-upload-filter">
-                Upload
+                Arquivo
               </label>
               <select
                 id="person-upload-filter"
@@ -632,7 +632,7 @@ export default function PersonDetailPage() {
                     Papel
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
-                    Upload
+                    Arquivo
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
                     Cidade

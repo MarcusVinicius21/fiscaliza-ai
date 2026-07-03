@@ -9,6 +9,7 @@ type SidebarIconName =
   | "upload"
   | "search"
   | "investigation"
+  | "people"
   | "records"
   | "alerts"
   | "contracts"
@@ -33,6 +34,7 @@ const navGroups = [
       { href: "/uploads", label: "Uploads", description: "Importar dados", icon: "upload" },
       { href: "/search", label: "Busca", description: "Pessoas e fornecedores", icon: "search" },
       { href: "/fornecedores", label: "Fornecedores", description: "Quem aparece", icon: "search" },
+      { href: "/pessoas", label: "Pessoas", description: "Servidores e nomes", icon: "people" },
       { href: "/investigacoes", label: "Investigacoes", description: "Pessoas e fornecedores", icon: "investigation" },
       { href: "/records", label: "Linhas", description: "Base carregada", icon: "records" },
       { href: "/alerts", label: "Alertas", description: "O que exige atencao", icon: "alerts" },
@@ -95,6 +97,12 @@ function SidebarIcon({ name }: { name: SidebarIconName }) {
       return (
         <svg {...common}>
           <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4ZM4 21a8 8 0 0 1 16 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      );
+    case "people":
+      return (
+        <svg {...common}>
+          <path d="M8 11a3 3 0 1 0-3-3 3 3 0 0 0 3 3ZM16 11a3 3 0 1 0-3-3 3 3 0 0 0 3 3ZM3 21a5 5 0 0 1 10 0M11 21a5 5 0 0 1 10 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       );
     case "records":

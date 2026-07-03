@@ -31,7 +31,14 @@ interface SupplierOverview {
   };
   categories: Array<{ category: string; records_count: number; total_amount: number }>;
   uploads: Array<{ upload_id: string; file_name?: string | null; records_count: number; total_amount: number }>;
-  related_alerts: Array<{ id: string; title: string; explanation?: string | null; severity?: string | null; amount?: number | null }>;
+  related_alerts: Array<{
+    id: string;
+    title: string;
+    explanation?: string | null;
+    severity?: string | null;
+    amount?: number | null;
+    link_label?: string | null;
+  }>;
 }
 
 interface SupplierRecords {
@@ -205,6 +212,34 @@ export default function SupplierReportPage() {
       </section>
 
       <SupportRecordsTable records={supportRecords} />
+
+      <section className="invest-card p-5 sm:p-6">
+        <p className="invest-section-title">Pontos de atenção ligados ao fornecedor</p>
+        <p className="mt-2 text-sm leading-6 text-[var(--invest-muted)]">
+          O rótulo mostra por que o ponto de atenção aparece neste fornecedor.
+        </p>
+        <div className="mt-4 space-y-3">
+          {overview.related_alerts.length === 0 ? (
+            <p className="text-sm text-[var(--invest-muted)]">
+              Nenhum ponto de atenção ligado a este fornecedor no recorte atual.
+            </p>
+          ) : (
+            overview.related_alerts.slice(0, 6).map((alert) => (
+              <article key={alert.id} className="invest-card-solid p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-black text-[var(--invest-heading)]">{alert.title}</p>
+                    <p className="mt-1 text-xs text-[var(--invest-muted)]">
+                      {alert.link_label || "Precisa de conferência"}
+                    </p>
+                  </div>
+                  <span className="app-chip">{formatCurrency(Number(alert.amount || 0))}</span>
+                </div>
+              </article>
+            ))
+          )}
+        </div>
+      </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
         <AttentionPointCard

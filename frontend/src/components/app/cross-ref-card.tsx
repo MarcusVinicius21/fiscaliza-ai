@@ -47,19 +47,19 @@ function formatDocument(value?: string | null) {
 }
 
 function typeLabel(value?: string | null) {
-  if (value === "role_conflict") return "Conflito de papel";
+  if (value === "role_conflict") return "Papéis diferentes";
   if (value === "same_person_candidate") return "Mesma pessoa em bases distintas";
-  if (value === "homonym_candidate") return "Homonimo ou nome repetido";
-  return "Cruzamento tecnico";
+  if (value === "homonym_candidate") return "Nome parecido ou repetido";
+  return "Possível ligação";
 }
 
 function basisLabel(value?: string | null) {
   if (value === "document_exact") return "Documento igual";
   if (value === "document_and_role") return "Documento + papel";
-  if (value === "name_normalized") return "Nome normalizado";
-  if (value === "alias_cross") return "Alias cruzado";
+  if (value === "name_normalized") return "Nome parecido";
+  if (value === "alias_cross") return "Nome encontrado em comum";
   if (value === "name_similar_family") return "Nome parecido por familia";
-  return "Base tecnica";
+  return "Informação de apoio";
 }
 
 function entityTypeLabel(value?: string | null) {
@@ -67,7 +67,7 @@ function entityTypeLabel(value?: string | null) {
   if (value === "person") return "Pessoa";
   if (value === "supplier") return "Fornecedor";
   if (value === "organization") return "Organização";
-  return "Entidade";
+  return "Pessoa ou fornecedor";
 }
 
 function roleLabel(value?: string | null) {
@@ -112,16 +112,16 @@ function primaryEvidence(item: CrossRefCardItem) {
     return `Mesmo documento nas duas bases: ${formatDocument(evidence.shared_document)}.`;
   }
   if (evidence.alias_references && evidence.alias_references.length > 0) {
-    return `Alias em comum observado: ${evidence.alias_references.slice(0, 2).join(", ")}.`;
+    return `Nome encontrado em comum: ${evidence.alias_references.slice(0, 2).join(", ")}.`;
   }
   if (evidence.shared_uploads && evidence.shared_uploads.length > 0) {
     const total = evidence.shared_uploads.length;
-    return `Aparece em ${total} upload${total === 1 ? "" : "s"} em comum.`;
+    return `Aparece em ${total} arquivo${total === 1 ? "" : "s"} em comum.`;
   }
   if (evidence.shared_normalized_name) {
-    return "Nome normalizado é idêntico. Pode ser a mesma pessoa ou um homônimo — precisa de apuração humana.";
+    return "Nome parecido ou igual. Pode ser a mesma pessoa ou apenas nomes parecidos; precisa de conferência.";
   }
-  return "Cruzamento técnico gerado para orientar apuração humana. Nenhuma conclusão automática é feita aqui.";
+  return "Informação de apoio para orientar conferência. Nenhuma conclusão automática é feita aqui.";
 }
 
 export function CrossRefCard({
@@ -146,7 +146,7 @@ export function CrossRefCard({
         <div className="min-w-0">
           <p className="invest-eyebrow">{typeLabel(item.cross_ref_type)}</p>
           <p className="mt-2 text-base font-black text-[var(--invest-heading)]">
-            {counterpart?.canonical_name || "Entidade relacionada"}
+            {counterpart?.canonical_name || "Pessoa ou fornecedor relacionado"}
           </p>
           <p className="mt-1 text-sm text-[var(--invest-muted)]">
             {formatDocument(counterpart?.document)}
@@ -163,17 +163,17 @@ export function CrossRefCard({
       <div className="mt-4 flex flex-wrap gap-2">
         <span className="app-chip">{basisLabel(item.match_basis)}</span>
         <span className="app-chip">
-          Score {Number(item.confidence_score || 0).toFixed(2)}
+          Nível {Number(item.confidence_score || 0).toFixed(2)}
         </span>
       </div>
 
       <p className="mt-4 text-sm leading-6 text-[var(--invest-muted)]">
-        {item.reason_summary || "Cruzamento técnico gerado para orientar apuração humana."}
+        {item.reason_summary || "Informação de apoio para orientar conferência."}
       </p>
 
       <div className="mt-4 rounded-lg border border-[var(--invest-border)] bg-[var(--invest-surface-soft)] p-4">
         <p className="text-xs font-black uppercase tracking-[0.12em] text-[var(--invest-faint)]">
-          Evidência principal
+          Informação principal
         </p>
         <p className="mt-2 text-sm leading-6 text-[var(--invest-muted)]">
           {primaryEvidence(item)}
@@ -190,7 +190,7 @@ export function CrossRefCard({
 
       <div className="mt-4 flex items-center justify-between gap-3">
         <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--invest-faint)]">
-          Exige apuração humana
+          Precisa de conferência
         </p>
         {counterpart?.id ? (
           <Link href={entityHref(counterpart)} className="invest-button-secondary px-4">
