@@ -656,7 +656,7 @@ export default function DashboardPage() {
 
       <DashboardActionCarousel
         uploadHref={uploadDiagnosticHref}
-        supplierHref="/search?type=supplier"
+        supplierHref="/fornecedores"
         reportHref={topSupplierReportHref}
       />
 
