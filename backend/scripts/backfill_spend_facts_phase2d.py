@@ -124,7 +124,7 @@ def _safe_amount(value: Any) -> float | None:
         text = text.replace(",", ".")
     elif has_dot:
         parts = text.split(".")
-        if len(parts) > 1 and all(len(part) == 3 for part in parts[1:]):
+        if len(parts) > 2 and all(len(part) == 3 for part in parts[1:]):
             text = text.replace(".", "")
 
     try:
