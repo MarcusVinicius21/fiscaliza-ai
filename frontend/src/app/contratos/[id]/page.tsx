@@ -28,6 +28,7 @@ interface ContractDetail {
   contract_value?: number | null;
   total_paid?: number | null;
   bid_link_status?: string | null;
+  bid_link_reason?: string | null;
   provenance?: ProvenanceRow[];
   fragmentation_signal?: {
     related_contracts_count?: number | null;
@@ -252,7 +253,7 @@ export default function ContratoDetailPage() {
               ) : null}
             </div>
           ) : (
-            <GapCallout kind="no_bid" />
+            <GapCallout kind="no_bid" detail={contract?.bid_link_reason || undefined} />
           )}
         </div>
       </section>

@@ -276,6 +276,11 @@ export default function PagamentosPage() {
                       </td>
                       <td className="border-b border-[var(--invest-border)] py-2 pr-3">
                         <ChainStatusBadge status={item.contract_link_status || "unlinked"} />
+                        {(item.contract_link_status || "unlinked") === "unlinked" ? (
+                          <p className="mt-1 max-w-56 text-xs leading-5 text-[var(--invest-muted)]">
+                            Sem vínculo factual encontrado: faltam contrato, licitação, processo ou objeto suficiente.
+                          </p>
+                        ) : null}
                       </td>
                       <td className="border-b border-[var(--invest-border)] py-2">
                         <Link href={`/pagamentos/${item.id}`} className="invest-button inline-flex px-3 py-1 text-xs">

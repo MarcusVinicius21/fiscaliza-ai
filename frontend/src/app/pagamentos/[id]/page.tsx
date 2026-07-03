@@ -245,7 +245,7 @@ export default function PagamentoDetailPage() {
               </Link>
             </div>
           ) : (
-            <GapCallout kind="no_contract" />
+            <GapCallout kind="no_contract" detail={link?.link_reason || undefined} />
           )}
         </div>
       </section>
