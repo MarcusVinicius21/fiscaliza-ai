@@ -1,4 +1,4 @@
-﻿# Log de Sessão — Antigravity Dashboard Visual
+# Log de Sessão — Antigravity Dashboard Visual
 
 ## Metadados da Sessão
 
@@ -504,3 +504,24 @@ Passou — apenas warnings LF/CRLF do Windows.
 - **Arquivos alterados**: frontend/src/app/fornecedores/[id]/page.tsx
 - **Confirmação**: Não foi mexido em banco, migrations, schema, ETL, raw_json, backfill, linker, SQL, /process, /analyze ou cálculos. Nenhuma API externa foi integrada.
 - **Confirmação de commit**: Não foi feito commit nesta execução.
+
+---
+
+## Execução 7 — B4-A migration planejada para revisão manual de duplicidades
+
+- **Estado inicial do Git**: Limpo, branch criada `feature/b4-revisao-duplicidades-planejada`.
+- **Commit base**: ba01319
+- **Objetivo**: Preparar a etapa B4-A — Revisão manual de possíveis duplicidades, com migration SQL e rollback.
+- **Migration criada**: `supabase/migrations/20260703_01_phase2b4_duplicate_review.sql`
+- **Rollback criado**: `docs/sql-rollbacks/20260703_rollback_phase2b4_duplicate_review.sql`
+- **Checkpoint criado**: `docs/checkpoints/fase-2b4-revisao-duplicidades-planejada.md`
+- **Segurança**:
+  - Confirmação de que a migration NÃO foi aplicada.
+  - Confirmação de que nenhum SQL foi executado.
+  - Confirmação de que nenhum banco foi alterado.
+- **Pendências**:
+  - Nenhuma. Tudo criado apenas como documento.
+- **Próximos passos**:
+  - Revisar a migration planejada;
+  - Aplicar no banco posteriormente;
+  - Criar tela de revisão.
