@@ -5,6 +5,7 @@ import re
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 import google.generativeai as genai
 import pandas as pd
@@ -12,6 +13,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 from dotenv import load_dotenv
+
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+load_dotenv(BACKEND_DIR / ".env")
+
 try:
     from app.routers.bids import router as bids_router
     from app.routers.contracts import router as contracts_router
@@ -26,8 +31,6 @@ except ModuleNotFoundError:
     from backend.app.routers.investigations import router as investigations_router
     from backend.app.routers.payments import router as payments_router
     from backend.app.routers.people import router as people_router
-
-load_dotenv()
 
 app = FastAPI(title="Fiscaliza.AI Backend - Etapa 4.5 Definitiva")
 
