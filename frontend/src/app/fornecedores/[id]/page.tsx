@@ -559,7 +559,7 @@ export default function SupplierDetailPage() {
           <div>
             <p className="invest-section-title">Possíveis duplicidades</p>
             <p className="mt-1 text-sm text-[var(--invest-muted)]">
-              Encontramos nomes ou documentos parecidos que podem representar o mesmo fornecedor. Confira antes de concluir.
+              Estes nomes ou documentos parecem parecidos. Confira antes de concluir que são o mesmo fornecedor.
             </p>
           </div>
           <StatusPill tone={possibleDuplicates.length > 0 ? "warning" : "success"}>

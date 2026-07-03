@@ -488,3 +488,19 @@ Passou — apenas warnings LF/CRLF do Windows.
 - [OK] Não alterou cálculos de contratos ou pagamentos.
 - [OK] Não integrou APIs externas.
 - [OK] NÃO foi feito commit.
+
+---
+
+## Execução 6 — Auditoria B4-A revisão manual de duplicidades
+
+- **Estado inicial do Git**: Limpo, sem arquivos pendentes
+- **Commit base**: 62831b2 — Avanca aliases alertas e base de pessoas da Fase 2
+- **Objetivo**: Auditar estado atual da Fase 2 B2/B3/C0 e preparar terreno para B4-A com segurança.
+- **Validações executadas**: lint no frontend (0 erros, 5 warnings preexistentes), git diff --check, e py_compile dos routers sensíveis (0 erros).
+- **Endpoints testados**: /suppliers?limit=3, /entities/search, /suppliers/{id}, /suppliers/{id}/possible-duplicates, /suppliers/{id}/alerts, /suppliers/{id}/records
+- **Rotas testadas**: /dashboard, /search, /fornecedores, /fornecedores/{id}, /relatorios/fornecedor/{id}, /pessoas, /investigacoes, /contratos, /pagamentos, /licitacoes
+- **Conclusão da auditoria**: A base de B2/B3/C0 está sólida. O endpoint de duplicidades funciona corretamente, sem side effects. Os textos estavam quase 100% corretos.
+- **Alteração de código**: Apenas texto de instrução.
+- **Arquivos alterados**: frontend/src/app/fornecedores/[id]/page.tsx
+- **Confirmação**: Não foi mexido em banco, migrations, schema, ETL, raw_json, backfill, linker, SQL, /process, /analyze ou cálculos. Nenhuma API externa foi integrada.
+- **Confirmação de commit**: Não foi feito commit nesta execução.

@@ -38,3 +38,11 @@ Decidir entre:
 - Avançar em pessoas/servidores com diretório read-only dedicado.
 - Importar licitações quando houver arquivo adequado.
 - Iniciar CNPJ/QSA com cache externo e separação clara entre dado do arquivo e dado externo.
+
+## B4-A — Revisão manual de possíveis duplicidades
+
+- As duplicidades identificadas são apenas indícios e não afirmações conclusivas.
+- Não há merge automático de fornecedores ou de seus IDs.
+- Não há gravação de decisões de deduplicação no banco de dados.
+- O usuário deve conferir manualmente documento, nome, arquivo e linha para cada possível duplicidade.
+- Um próximo passo futuro poderá incluir uma revisão manual com decisão registrada, porém isso exigirá uma nova etapa dedicada, criação de interface para revisão e provável migration no banco.
