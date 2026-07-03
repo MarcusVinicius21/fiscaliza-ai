@@ -652,6 +652,51 @@ html[data-theme="dark"] .invest-soft-scroll::-webkit-scrollbar-thumb {
   background: rgba(249, 249, 249, 0.22);
 }
 
+@media print {
+  html,
+  body {
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  aside,
+  header,
+  .no-print,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .fiscaliza-shell,
+  .page-shell,
+  .report-shell {
+    background: #ffffff !important;
+    color: #111827 !important;
+    display: block !important;
+  }
+
+  .page-header,
+  .invest-card,
+  .invest-card-solid,
+  .invest-card-highlight,
+  .evidence-card {
+    break-inside: avoid;
+    box-shadow: none !important;
+  }
+
+  .report-cover {
+    margin-bottom: 16px;
+  }
+
+  .invest-table {
+    font-size: 11px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

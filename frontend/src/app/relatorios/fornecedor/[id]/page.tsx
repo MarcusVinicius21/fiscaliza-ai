@@ -7,7 +7,9 @@ import { SkeletonBlock } from "@/components/app/skeleton-block";
 import {
   AttentionPointCard,
   DiagnosticCard,
+  ExecutiveSummaryPanel,
   PrintReportLayout,
+  SupportRecordsTable,
   formatCurrency,
 } from "@/components/product/investigative-product";
 
@@ -115,11 +117,35 @@ export default function SupplierReportPage() {
     );
   }
 
+  const supportRecords = (records?.items || []).map((record) => ({
+    id: record.record_id,
+    file_name: record.file_name,
+    category: record.category,
+    date: record.data,
+    amount: record.valor_bruto,
+    supplier: overview.supplier.canonical_name,
+    summary: record.summary,
+  }));
+  const topCategory = overview.categories[0];
+  const limitationText = overview.categories.some((category) => category.category === "contracts")
+    ? "Ha registro contratual relacionado. Quando nao houver pagamento vinculado, leia como ausencia de chave automatica ou base complementar nao carregada."
+    : "A leitura consolida os registros disponiveis sem afirmar vinculo factual quando a cadeia automatica nao existir.";
+
   return (
     <PrintReportLayout
       title={overview.supplier.canonical_name}
       subtitle={`Fornecedor 360 básico. ${formatDocument(overview.supplier.document)}.`}
     >
+      <ExecutiveSummaryPanel
+        title="Consolidado do fornecedor"
+        body="Este dossie organiza presenca em uploads, volume financeiro, alertas e registros de apoio. A leitura aponta concentracao e pontos de atencao, sem substituir conferencia documental."
+        points={[
+          `${formatCurrency(overview.summary.total_amount)} em valor consolidado.`,
+          `${overview.summary.records_count} registro(s) em ${overview.summary.uploads_count} upload(s).`,
+          topCategory ? `Maior categoria: ${topCategory.category || "nao informado"}.` : "Categoria principal nao informada.",
+        ]}
+      />
+
       <DiagnosticCard
         title="Resumo executivo"
         items={[
@@ -178,38 +204,16 @@ export default function SupplierReportPage() {
         </article>
       </section>
 
-      <section className="invest-card p-5 sm:p-6">
-        <p className="invest-section-title">Registros de apoio</p>
-        <div className="mt-4 overflow-x-auto">
-          <table className="invest-table min-w-[780px]">
-            <thead>
-              <tr>
-                <th>Upload</th>
-                <th>Categoria</th>
-                <th>Data</th>
-                <th>Valor</th>
-                <th>Resumo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(records?.items || []).map((record) => (
-                <tr key={record.record_id}>
-                  <td>{record.file_name || "não informado"}</td>
-                  <td>{record.category || "não informado"}</td>
-                  <td>{record.data || "não informado"}</td>
-                  <td>{formatCurrency(record.valor_bruto)}</td>
-                  <td>{record.summary || "não informado"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <SupportRecordsTable records={supportRecords} />
 
       <section className="grid gap-4 lg:grid-cols-2">
         <AttentionPointCard
-          title="Leitura cautelosa"
-          body="Este dossiê organiza concentração, presença em uploads e registros relacionados. Ele não substitui conferência documental."
+          title="O que chama atenção"
+          body={`Valor consolidado e presença em ${overview.summary.uploads_count} upload(s) ajudam a priorizar a revisão humana deste fornecedor.`}
+        />
+        <AttentionPointCard
+          title="Limitações da leitura"
+          body={limitationText}
           tone="info"
         />
         <AttentionPointCard

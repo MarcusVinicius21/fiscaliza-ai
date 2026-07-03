@@ -498,7 +498,7 @@ export default function UploadsPage() {
                           href={`/uploads/${up.id}/diagnostico`}
                           className="invest-button-secondary px-3 py-1 text-xs"
                         >
-                          Diagnóstico
+                          Abrir diagnóstico
                         </a>
                         <a
                           href={`/relatorios/upload/${up.id}`}

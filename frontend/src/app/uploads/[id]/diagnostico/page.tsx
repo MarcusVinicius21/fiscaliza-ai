@@ -8,8 +8,10 @@ import { SkeletonBlock } from "@/components/app/skeleton-block";
 import {
   AttentionPointCard,
   DiagnosticCard,
+  ExecutiveSummaryPanel,
   FactLinkStatusSummary,
   SupplierRanking,
+  SupportRecordsTable,
   formatCurrency,
 } from "@/components/product/investigative-product";
 import { UploadDiagnostic, fetchUploadDiagnostic } from "@/lib/product-diagnostics";
@@ -69,6 +71,9 @@ export default function UploadDiagnosticPage() {
   }
 
   const upload = diagnostic.upload;
+  const cityLabel = upload.city_name ? `${upload.city_name}${upload.state ? `/${upload.state}` : ""}` : "cidade nao informada";
+  const statusLabel = upload.analysis_status || upload.status || "nao informado";
+  const missingKeys = diagnostic.quality.records_with_any_link_key === 0;
   const qualityItems = [
     { label: "Contrato", present: diagnostic.quality.has_contract_keys },
     { label: "Licitação", present: diagnostic.quality.has_bid_keys },
@@ -108,13 +113,27 @@ export default function UploadDiagnosticPage() {
         </div>
       </section>
 
+      <ExecutiveSummaryPanel
+        title="Leitura executiva do arquivo"
+        body="Este diagnostico organiza volume, valor identificado, concentracao por fornecedor e lacunas de vinculo factual. Ele serve para priorizar revisao e nao substitui conferencia documental."
+        points={[
+          `${diagnostic.summary.records_count} registro(s) lido(s) neste upload.`,
+          `${formatCurrency(diagnostic.summary.total_amount)} identificado no recorte atual.`,
+          missingKeys
+            ? "Faltam chaves no arquivo para ligacao automatica."
+            : `${diagnostic.quality.records_with_any_link_key} registro(s) trazem alguma chave de ligacao.`,
+        ]}
+      />
+
       <DiagnosticCard
-        title="Resumo executivo"
+        title="Numeros principais"
         items={[
+          { label: "Arquivo", value: upload.file_name || "nao informado", hint: `${upload.category || "categoria nao informada"} / ${upload.report_type || "tipo nao informado"}` },
+          { label: "Cidade/cliente", value: cityLabel },
           { label: "Registros", value: diagnostic.summary.records_count },
           { label: "Valor identificado", value: formatCurrency(diagnostic.summary.total_amount) },
           { label: "Alertas", value: diagnostic.summary.alerts_count },
-          { label: "Status", value: upload.analysis_status || upload.status || "não informado" },
+          { label: "Status", value: statusLabel },
         ]}
       />
 
@@ -139,6 +158,8 @@ export default function UploadDiagnosticPage() {
           tone="info"
         />
       </section>
+
+      <SupportRecordsTable records={diagnostic.support_records} />
 
       <section className="invest-card p-5 sm:p-6">
         <p className="invest-section-title">Qualidade das chaves do arquivo</p>

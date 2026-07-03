@@ -7,9 +7,11 @@ import { SkeletonBlock } from "@/components/app/skeleton-block";
 import {
   AttentionPointCard,
   DiagnosticCard,
+  ExecutiveSummaryPanel,
   FactLinkStatusSummary,
   PrintReportLayout,
   SupplierRanking,
+  SupportRecordsTable,
   formatCurrency,
 } from "@/components/product/investigative-product";
 import { UploadDiagnostic, fetchUploadDiagnostic } from "@/lib/product-diagnostics";
@@ -69,12 +71,26 @@ export default function UploadReportPage() {
   }
 
   const upload = diagnostic.upload;
+  const hasMissingLinks =
+    diagnostic.link_status.contracts.unlinked > 0 ||
+    diagnostic.link_status.payments.unlinked > 0 ||
+    diagnostic.link_status.bids.total === 0;
 
   return (
     <PrintReportLayout
       title={upload.file_name || "Upload sem nome"}
       subtitle="Relatório visual básico para impressão, com resumo executivo e pontos de atenção."
     >
+      <ExecutiveSummaryPanel
+        title="Diagnostico executivo do upload"
+        body="Este dossie resume volume, valor identificado, concentracao por fornecedor e lacunas de vinculo factual do arquivo carregado. Use como roteiro de revisao e nao como conclusao automatica."
+        points={[
+          `${diagnostic.summary.records_count} registro(s) e ${formatCurrency(diagnostic.summary.total_amount)} identificados.`,
+          `${diagnostic.summary.alerts_count} alerta(s) relacionado(s) ao upload.`,
+          hasMissingLinks ? "Ha vinculos ausentes que requerem analise humana." : "Os vinculos factuais disponiveis foram encontrados.",
+        ]}
+      />
+
       <DiagnosticCard
         title="Números principais"
         items={[
@@ -97,15 +113,26 @@ export default function UploadReportPage() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
+        <AttentionPointCard
+          title="O que chama atencao"
+          body="Concentracao por fornecedor, alertas e ausencia de chaves ajudam a decidir onde revisar primeiro."
+        />
         {diagnostic.attention_points.map((point) => (
           <AttentionPointCard key={point.title} title={point.title} body={point.body} />
         ))}
         <AttentionPointCard
-          title="Observação cautelosa"
-          body="Este dossiê organiza sinais e lacunas do acervo. Qualquer conclusão depende de conferência humana e documentos complementares."
+          title="Limitacoes da leitura"
+          body="Este dossie organiza sinais e lacunas do acervo. Qualquer conclusao depende de conferencia humana e documentos complementares."
+          tone="info"
+        />
+        <AttentionPointCard
+          title="Vinculos ausentes"
+          body="Sem vinculo factual encontrado deve ser lido como falta de chave no arquivo ou base complementar ainda nao carregada."
           tone="info"
         />
       </section>
+
+      <SupportRecordsTable records={diagnostic.support_records} />
 
       <section className="invest-card p-5 sm:p-6 print:hidden">
         <Link href={`/uploads/${upload.id}/diagnostico`} className="invest-button-secondary px-4">

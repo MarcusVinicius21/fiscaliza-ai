@@ -40,6 +40,15 @@ export interface UploadDiagnostic {
     has_object_text: boolean;
     records_with_any_link_key: number;
   };
+  support_records: Array<{
+    id: string;
+    file_name?: string | null;
+    category?: string | null;
+    date?: string | null;
+    amount: number;
+    supplier?: string | null;
+    summary?: string | null;
+  }>;
   attention_points: Array<{ title: string; body: string }>;
 }
 
@@ -235,6 +244,15 @@ export async function fetchUploadDiagnostic(uploadId: string): Promise<UploadDia
   );
 
   const rankings = buildRankings(records);
+  const supportRecords = records.slice(0, 12).map((record) => ({
+    id: record.id,
+    file_name: uploadRow.file_name,
+    category: record.category || uploadRow.category,
+    date: rawValue(record, ["data", "data_pagamento", "data_contrato", "competencia"]),
+    amount: parseMoney(record.valor_bruto || rawValue(record, ["valor_pago", "valor", "valor_contrato", "valor_contratado"])),
+    supplier: supplierName(record),
+    summary: rawValue(record, ["objeto", "descricao", "historico", "observacao", "detalhamento"]),
+  }));
   const linkKeyGroups = {
     contract: ["numero_contrato", "contrato", "contract_number"],
     bid: ["numero_licitacao", "licitacao", "bid_number"],
@@ -318,6 +336,7 @@ export async function fetchUploadDiagnostic(uploadId: string): Promise<UploadDia
       has_object_text: keyPresence.object > 0 || contracts.some((item) => item.object_text) || payments.some((item) => item.object_text),
       records_with_any_link_key: keyPresence.any,
     },
+    support_records: supportRecords,
     attention_points: attentionPoints,
   };
 }

@@ -19,9 +19,48 @@ export interface RankingItem {
   href?: string;
 }
 
+export interface SupportRecordItem {
+  id: string;
+  file_name?: string | null;
+  category?: string | null;
+  date?: string | null;
+  amount?: number;
+  supplier?: string | null;
+  summary?: string | null;
+}
+
 export function formatCurrency(value: number | null | undefined) {
   if (typeof value !== "number" || Number.isNaN(value)) return "não informado";
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+export function ExecutiveSummaryPanel({
+  title,
+  body,
+  points,
+}: {
+  title: string;
+  body: string;
+  points: string[];
+}) {
+  return (
+    <section className="invest-card p-5 sm:p-6">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div>
+          <p className="invest-eyebrow">Resumo executivo</p>
+          <h2 className="mt-2 text-xl font-black text-[var(--invest-heading)]">{title}</h2>
+          <p className="mt-3 text-sm leading-6 text-[var(--invest-muted)]">{body}</p>
+        </div>
+        <div className="space-y-2">
+          {points.map((point) => (
+            <div key={point} className="invest-card-solid px-4 py-3">
+              <p className="text-sm font-bold leading-6 text-[var(--invest-heading)]">{point}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
 }
 
 export function DiagnosticCard({ title, items }: { title: string; items: MetricItem[] }) {
@@ -142,6 +181,54 @@ export function AttentionPointCard({ title, body, tone = "warning" }: { title: s
   );
 }
 
+export function SupportRecordsTable({ records }: { records: SupportRecordItem[] }) {
+  return (
+    <section className="invest-card p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="invest-section-title">Registros de apoio</p>
+          <p className="mt-1 text-sm text-[var(--invest-muted)]">
+            Amostra das linhas usadas para contextualizar o recorte. Nao substitui conferencia documental.
+          </p>
+        </div>
+        <StatusPill tone="muted">{records.length} linha(s)</StatusPill>
+      </div>
+      <div className="mt-4 overflow-x-auto">
+        <table className="invest-table min-w-[820px]">
+          <thead>
+            <tr>
+              <th>Origem</th>
+              <th>Categoria</th>
+              <th>Fornecedor</th>
+              <th>Data</th>
+              <th>Valor</th>
+              <th>Resumo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {records.length === 0 ? (
+              <tr>
+                <td colSpan={6}>Nenhum registro de apoio disponivel neste recorte.</td>
+              </tr>
+            ) : (
+              records.map((record) => (
+                <tr key={record.id}>
+                  <td>{record.file_name || "upload atual"}</td>
+                  <td>{record.category || "nao informado"}</td>
+                  <td>{record.supplier || "nao informado"}</td>
+                  <td>{record.date || "nao informado"}</td>
+                  <td>{formatCurrency(record.amount || 0)}</td>
+                  <td>{record.summary || "nao informado"}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 export function EmptyStateWithReason({ reason }: { reason: string }) {
   return (
     <div className="rounded-lg border border-dashed border-[var(--invest-border-strong)] bg-[var(--invest-surface-soft)] p-4">
@@ -160,15 +247,15 @@ export function PrintReportLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="page-shell print:bg-white">
-      <section className="page-header px-5 py-5 sm:px-6 print:border-0 print:shadow-none">
+    <div className="page-shell report-shell print:bg-white">
+      <section className="page-header report-cover px-5 py-5 sm:px-6 print:border-0 print:shadow-none">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="invest-eyebrow">Dossiê investigativo</p>
             <h1 className="invest-title mt-3 text-2xl sm:text-[2rem]">{title}</h1>
             <p className="invest-subtitle mt-3 text-sm sm:text-base">{subtitle}</p>
           </div>
-          <button type="button" className="invest-button px-4 py-2 print:hidden" onClick={() => window.print()}>
+          <button type="button" className="invest-button no-print px-4 py-2 print:hidden" onClick={() => window.print()}>
             Imprimir / Salvar como PDF
           </button>
         </div>
