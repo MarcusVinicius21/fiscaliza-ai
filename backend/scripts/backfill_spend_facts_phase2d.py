@@ -12,8 +12,16 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
+from decimal import Decimal
+from pathlib import Path
 from typing import Any
+
+from dotenv import load_dotenv
+
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+load_dotenv(BACKEND_DIR / ".env")
 
 # pylint: disable=wrong-import-position
 try:
@@ -95,10 +103,30 @@ def _raw_value(record: dict, keys: list[str]) -> str:
 def _safe_amount(value: Any) -> float | None:
     if value in (None, ""):
         return None
-    if isinstance(value, (int, float)):
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float, Decimal)):
         return float(value)
-    text = str(value).replace("R$", "").strip()
-    text = text.replace(".", "").replace(",", ".")
+    text = str(value).replace("R$", "").replace("\xa0", " ").strip()
+    text = re.sub(r"[^\d,.\-]", "", text)
+    if not text or text in {"-", ".", ","}:
+        return None
+
+    has_comma = "," in text
+    has_dot = "." in text
+
+    if has_comma and has_dot:
+        if text.rfind(",") > text.rfind("."):
+            text = text.replace(".", "").replace(",", ".")
+        else:
+            text = text.replace(",", "")
+    elif has_comma:
+        text = text.replace(",", ".")
+    elif has_dot:
+        parts = text.split(".")
+        if len(parts) > 1 and all(len(part) == 3 for part in parts[1:]):
+            text = text.replace(".", "")
+
     try:
         return float(text)
     except Exception:  # noqa: BLE001
@@ -654,12 +682,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--upload-id", type=str, default=None)
     parser.add_argument("--category", type=str, choices=list(RELEVANT_CATEGORIES), default=None)
     args = parser.parse_args(argv)
-
-    try:
-        from dotenv import load_dotenv  # local import para nao exigir em tests
-        load_dotenv()
-    except Exception:  # noqa: BLE001
-        pass
 
     if not os.getenv("SUPABASE_URL") or not os.getenv("SUPABASE_KEY"):
         _log("SUPABASE_URL/SUPABASE_KEY ausentes no ambiente.")
