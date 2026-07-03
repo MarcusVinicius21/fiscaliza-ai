@@ -159,3 +159,84 @@ Log gerado automaticamente por Anti-Gravity (Antigravity CLI) com Claude Sonnet 
 - [OK] Não foram feitas alterações em banco, ETL, raw_json, backfill, linker, SQL, migration, /process ou /analyze.
 - [OK] Nenhuma biblioteca foi instalada.
 - [OK] Nenhum schema foi alterado.
+
+---
+
+## Execução 1 — Correções finas pós-checkpoint
+
+| Campo | Valor |
+|---|---|
+| **Data/Hora** | 2026-07-03 — 06:50 (UTC-3, Brasília) |
+| **Ferramenta** | Anti-Gravity + Claude Sonnet 4.6 (Thinking) |
+| **Commit base** | 1181b18 |
+| **Tag base** | checkpoint-dashboard-guiada-pre-antigravity |
+| **Objetivo** | Corrigir 3 pendências visuais: inconsistência hero/seletor, textos sem acento, repetição de "Comece por aqui" |
+
+### Arquivos pretendidos para alteração
+
+- `frontend/src/app/dashboard/page.tsx`
+- `frontend/src/components/product/guided-dashboard.tsx`
+
+### git status inicial
+
+Repositório limpo — sem nenhuma alteração pendente antes de iniciar.
+
+### Regras de segurança
+
+- Não mexer em banco, ETL, raw_json, backfill, linker, SQL, migration, /process ou /analyze.
+- Não instalar bibliotecas.
+- Não fazer commit sem autorização.
+- Alterações restritas a strings visíveis na interface.
+
+### Resultado final da Execução 1
+
+#### Arquivos alterados
+
+- `frontend/src/app/dashboard/page.tsx` — auto-seleção do primeiro upload analisado (via fetchDashboardData), remoção de "Comece por aqui" duplicado → "Arquivo analisado", textos sem acento corrigidos.
+- `frontend/src/components/product/guided-dashboard.tsx` — "Arquivo em analise" → "Último arquivo analisado", todos os textos visíveis sem acento corrigidos.
+- `docs/ai-runs/2026-07-03-antigravity-dashboard-visual.md` — este log atualizado.
+
+#### Resumo das mudanças
+
+1. **Inconsistência hero/seletor resolvida**: Auto-seleção do primeiro upload analisado inserida diretamente em `fetchDashboardData`, usando `setSelectedUploadId((prev) => prev || primeiroAnalisado.id)` para não sobrescrever seleção manual. Hero agora exibe "Último arquivo analisado" em vez de "Arquivo em analise".
+2. **Acentuação corrigida**: Todos os textos visíveis sem acento nos dois arquivos foram corrigidos (relatório, análise, atenção, você, decisão, disponível, etc.).
+3. **Repetição de "Comece por aqui" eliminada**: Na seção do seletor, substituído por "Arquivo analisado" com descrição coerente ao comportamento de auto-seleção.
+
+#### Comandos executados
+
+- `git status --short` (inicial e final)
+- `git diff --stat`
+- `git diff --check` ✅ passou
+- `npm.cmd run lint` — reportou 6 erros, todos PRÉ-EXISTENTES (InfoHint/cities/clients), não introduzidos por esta sessão.
+
+#### Resultado do git diff --check
+
+Passou — apenas warnings LF/CRLF do Windows (esperado).
+
+#### Resultado do lint
+
+6 erros pré-existentes (não introduzidos):
+- `cities/page.tsx:30` — variável acessada antes de declarada (pré-existente)
+- `clients/page.tsx:22` — variável acessada antes de declarada (pré-existente)
+- `dashboard/page.tsx:229` — `position()` no useEffect do InfoHint (pré-existente, componente não alterado por esta sessão)
+
+#### Rotas disponíveis para teste manual
+
+- `http://localhost:3000/dashboard` — principal (auto-seleção, hero coerente, textos acentuados)
+- `http://localhost:3000/uploads`
+- `http://localhost:3000/search`
+- `http://localhost:3000/contratos`
+- `http://localhost:3000/pagamentos`
+- `http://localhost:3000/licitacoes`
+- `http://localhost:3000/fornecedores/69ac617e-bc8c-4900-ae1d-853774d8cdb8`
+- `http://localhost:3000/relatorios/fornecedor/69ac617e-bc8c-4900-ae1d-853774d8cdb8`
+
+#### Pendências restantes
+
+- Nenhuma das 3 pendências originais permanece — todas corrigidas nesta execução.
+- Erros de lint pré-existentes em cities/clients/InfoHint permanecem, mas estão fora do escopo.
+
+#### Confirmações de segurança
+
+- [OK] Não mexeu em banco, migrations, schema, ETL, raw_json, backfill, linker, SQL, /process ou /analyze.
+- [OK] NÃO foi feito commit. Alterações estão apenas no working tree.

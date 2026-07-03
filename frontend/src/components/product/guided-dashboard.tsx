@@ -50,7 +50,7 @@ function formatDocument(value?: string | null) {
   if (digits.length === 11) {
     return digits.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
   }
-  return value || "documento nao informado";
+  return value || "documento não informado";
 }
 
 function DashboardVisualIcon({ name }: { name: DashboardIconName }) {
@@ -165,14 +165,14 @@ export function buildGuidedSteps(params: {
     {
       number: "1",
       title: "Escolha o arquivo",
-      description: "Selecione um arquivo ja enviado ou envie um novo.",
+      description: "Selecione um arquivo já enviado ou envie um novo.",
       href: "/uploads",
       cta: "Ver arquivos",
     },
     {
       number: "2",
       title: "Veja o resumo",
-      description: "Confira linhas, valores, alertas e o que chama atencao.",
+      description: "Confira linhas, valores, alertas e o que chama atenção.",
       href: params.uploadDiagnosticHref,
       cta: "Ver resumo",
       disabledReason: "O resumo aparece depois que um arquivo for analisado.",
@@ -190,20 +190,20 @@ export function buildGuidedSteps(params: {
       description: "Veja onde ele aparece, valores e alertas ligados a ele.",
       href: params.topSupplierHref,
       cta: "Abrir fornecedor",
-      disabledReason: "Fornecedor disponivel depois da analise do arquivo.",
+      disabledReason: "Fornecedor disponível depois da análise do arquivo.",
     },
     {
       number: "5",
       title: "Gere o relat\u00f3rio",
-      description: "Crie uma versao para imprimir ou salvar em PDF.",
+      description: "Crie uma versão para imprimir ou salvar em PDF.",
       href: params.topSupplierReportHref,
-      cta: "Abrir relat\u00f3rio",
-      disabledReason: "Relatorio disponivel depois que um fornecedor for encontrado.",
+      cta: "Abrir relatório",
+      disabledReason: "Relatório disponível depois que um fornecedor for encontrado.",
     },
     {
       number: "6",
       title: "Confira com calma",
-      description: "O sistema ajuda a organizar. A decisao final deve ser conferida por uma pessoa.",
+      description: "O sistema ajuda a organizar. A decisão final deve ser conferida por uma pessoa.",
     },
   ];
 }
@@ -216,7 +216,7 @@ function DashboardHeroIllustration() {
         viewBox="0 0 520 270"
         className="absolute inset-0 h-full w-full"
         role="img"
-        aria-label="Ilustracao de analise de dados"
+        aria-label="Ilustração de análise de dados"
       >
         <defs>
           <linearGradient id="fiscalizaBlue" x1="0" x2="1">
@@ -296,10 +296,10 @@ export function GuidedDashboardHero({
 
           <div className="mt-6 inline-flex max-w-full flex-col rounded-2xl border border-blue-100 bg-white/74 px-4 py-3 shadow-sm backdrop-blur">
             <span className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
-              Arquivo em analise
+              Último arquivo analisado
             </span>
             <span className="mt-1 truncate text-sm font-black text-slate-950">
-              {uploadName || "Envie ou selecione um arquivo para comecar."}
+              {uploadName || "Envie ou selecione um arquivo para começar."}
             </span>
             {uploadMeta ? (
               <span className="mt-1 text-xs font-semibold text-slate-500">
@@ -334,7 +334,7 @@ export function DashboardActionCarousel({
   }> = [
     {
       title: "Resumo do arquivo",
-      description: "Veja o que chama atencao",
+      description: "Veja o que chama atenção",
       href: uploadHref || "/uploads",
       icon: "document",
       className: "from-blue-50 via-white to-blue-100/70 text-blue-700",
@@ -349,8 +349,8 @@ export function DashboardActionCarousel({
       iconClassName: "border-emerald-100 bg-emerald-50 text-emerald-600",
     },
     {
-      title: "Relatorio para imprimir",
-      description: "Leve a analise para reuniao",
+      title: "Relatório para imprimir",
+      description: "Leve a análise para reunião",
       href: reportHref || "/search",
       icon: "report",
       className: "from-violet-50 via-white to-violet-100/60 text-violet-700",
@@ -414,7 +414,7 @@ export function GuidedInvestigationFlow({ steps }: { steps: GuidedStep[] }) {
       <div className="mb-5">
         <h2 className="text-lg font-black text-slate-950">Use nesta ordem</h2>
         <p className="mt-1 text-sm leading-6 text-slate-600">
-          Um caminho simples para sair do arquivo e chegar ao relatorio.
+          Um caminho simples para sair do arquivo e chegar ao relatório.
         </p>
       </div>
 
@@ -470,12 +470,12 @@ export function InvestigationSuggestionCard({
   if (supplierError) {
     return (
       <section className="fiscaliza-product-light rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-600">Sugestao do Fiscaliza</p>
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-600">Sugestão do Fiscaliza</p>
         <h2 className="mt-2 text-xl font-black text-slate-950">
-          Nao foi possivel carregar os fornecedores agora.
+          Não foi possível carregar os fornecedores agora.
         </h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Voce ainda pode abrir a busca e procurar por pessoa ou fornecedor.
+          Você ainda pode abrir a busca e procurar por pessoa ou fornecedor.
         </p>
         <div className="mt-4">
           <ActionLink href="/search">Ir para busca</ActionLink>
@@ -487,12 +487,12 @@ export function InvestigationSuggestionCard({
   if (!supplier) {
     return (
       <section className="fiscaliza-product-light rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-600">Sugestao do Fiscaliza</p>
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-600">Sugestão do Fiscaliza</p>
         <h2 className="mt-2 text-xl font-black text-slate-950">
           Comece enviando ou escolhendo um arquivo.
         </h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Assim que houver dados analisados, o Fiscaliza.AI mostra por onde comecar.
+          Assim que houver dados analisados, o Fiscaliza.AI mostra por onde começar.
         </p>
         <div className="mt-4">
           <ActionLink href="/uploads">Ver arquivos</ActionLink>
@@ -508,7 +508,7 @@ export function InvestigationSuggestionCard({
           <DashboardVisualIcon name="star" />
         </div>
         <div className="min-w-0">
-          <p className="text-xs font-black text-blue-700">Sugestao do Fiscaliza</p>
+          <p className="text-xs font-black text-blue-700">Sugestão do Fiscaliza</p>
           <p className="mt-1 text-xs font-semibold text-slate-500">
             Fornecedor com maior valor encontrado
           </p>
@@ -541,7 +541,7 @@ export function InvestigationSuggestionCard({
           Abrir fornecedor
         </ActionLink>
         <ActionLink href={`/relatorios/fornecedor/${supplier.id}`} variant="secondary">
-          Abrir relatorio
+          Abrir relatório
         </ActionLink>
       </div>
     </section>
@@ -558,10 +558,10 @@ export function ResponsibleReadingCards() {
           </div>
           <div>
             <h2 className="text-base font-black text-orange-950">
-              Leitura responsavel
+              Leitura responsável
             </h2>
             <p className="mt-2 text-sm leading-6 text-orange-900">
-              A analise depende da qualidade dos dados. Arquivos incompletos podem esconder informacoes importantes.
+              A análise depende da qualidade dos dados. Arquivos incompletos podem esconder informações importantes.
             </p>
             <Link href="/uploads" className="mt-3 inline-flex text-sm font-black text-blue-700 hover:underline">
               Ver dicas de qualidade -&gt;
@@ -580,7 +580,7 @@ export function ResponsibleReadingCards() {
               Dados incompletos?
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Quando o arquivo nao traz numero de contrato, pagamento ou processo, algumas ligacoes podem nao aparecer automaticamente.
+              Quando o arquivo não traz número de contrato, pagamento ou processo, algumas ligações podem não aparecer automaticamente.
             </p>
           </div>
         </div>

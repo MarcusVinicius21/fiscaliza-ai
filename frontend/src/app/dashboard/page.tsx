@@ -357,6 +357,7 @@ export default function DashboardPage() {
     fetchTopSupplier();
   }, []);
 
+
   async function fetchTopSupplier() {
     setSupplierError("");
 
@@ -414,10 +415,15 @@ export default function DashboardPage() {
       setAlerts((alertsRes.data as unknown as AlertRecord[]) || []);
       setLogs((logsRes.data as AnalysisLog[]) || []);
 
-      // Nota: a dashboard NÃO auto-seleciona upload. O detalhe só carrega
-      // depois que o usuário escolhe um arquivo no seletor. Isso evita dar
-      // a impressão de que algo está sendo recalculado ao abrir a página.
-      // Nenhuma chamada a IA, /analyze ou /process acontece aqui.
+      // Auto-seleciona o primeiro upload analisado para eliminar contradição
+      // entre o hero (que já mostra o arquivo) e o seletor (que ficava vazio).
+      // Não chama /process, /analyze nem IA — apenas exibe dados já salvos.
+      const primeiroAnalisado = uploadsData.find(
+        (item) => item.analysis_status === "analyzed"
+      );
+      if (primeiroAnalisado) {
+        setSelectedUploadId((prev) => prev || primeiroAnalisado.id);
+      }
     } catch (error: unknown) {
       setErrorMessage(
         error instanceof Error ? error.message : "Falha ao carregar o dashboard."
@@ -620,7 +626,7 @@ export default function DashboardPage() {
     ? `${categoryLabel(bestUpload.category)} - ${bestUpload.report_type || "sem tipo"} - ${
         bestUpload.cities?.name
           ? `${bestUpload.cities.name}/${bestUpload.cities.state}`
-          : "cidade nao informada"
+          : "cidade não informada"
       } - ${formatDate(bestUpload.created_at)}`
     : undefined;
 
@@ -663,13 +669,13 @@ export default function DashboardPage() {
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-600">
-              Comece por aqui
+              Arquivo analisado
             </p>
             <h2 className="mt-2 text-xl font-black text-slate-950">
               Escolha um arquivo para ver os detalhes.
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              A tela mostra os arquivos ja analisados. Se quiser comecar do zero, abra a area de arquivos.
+              Este arquivo foi selecionado automaticamente para mostrar os dados já salvos. Você pode escolher outro arquivo no seletor.
             </p>
             <div className="mt-4 flex flex-wrap gap-3">
               <Link href="/uploads" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5">
@@ -714,7 +720,7 @@ export default function DashboardPage() {
                   {bestUpload.report_type || "sem tipo"} -{" "}
                   {bestUpload.cities?.name
                     ? `${bestUpload.cities.name}/${bestUpload.cities.state}`
-                    : "cidade nao informada"}{" "}
+                    : "cidade não informada"}{" "}
                   - {formatDate(bestUpload.created_at)}
                 </p>
               </div>
@@ -731,7 +737,7 @@ export default function DashboardPage() {
         supplierError={supplierError}
       />
 
-      <ChapterHeader label="Visao rapida" title="Numeros atuais" />
+      <ChapterHeader label="Visão rápida" title="Números atuais" />
       <section className="grid grid-cols-1 gap-3 md:grid-cols-4">
         <MetricCard
           label="Cidades"
@@ -741,17 +747,17 @@ export default function DashboardPage() {
         <MetricCard
           label="Arquivos lidos"
           value={uploadsProcessados.length}
-          help="Arquivos que ja foram lidos pelo sistema."
+          help="Arquivos que já foram lidos pelo sistema."
         />
         <MetricCard
           label="Arquivos analisados"
           value={uploadsAnalisados.length}
-          help="Arquivos que ja tem resumo, valores e pontos de atencao."
+          help="Arquivos que já têm resumo, valores e pontos de atenção."
         />
         <MetricCard
-          label="Pontos de atencao"
+          label="Pontos de atenção"
           value={alerts.length}
-          help="Sinais salvos para ajudar na conferencia. Um alerta nao e conclusao."
+          help="Sinais salvos para ajudar na conferência. Um alerta não é conclusão."
         />
       </section>
 
@@ -767,7 +773,7 @@ export default function DashboardPage() {
           <section className="rounded-lg border border-[var(--invest-border)] bg-white p-6 shadow-[var(--invest-shadow-soft)]">
             <p className="invest-eyebrow">Seleção necessária</p>
             <h2 className="mt-2 text-lg font-black text-[var(--invest-heading)]">
-              Escolha um arquivo para abrir a analise
+              Escolha um arquivo para abrir a análise
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--invest-muted)]">
               A dashboard mostra apenas resultados já salvos. Nada é
@@ -778,19 +784,19 @@ export default function DashboardPage() {
             <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-[var(--invest-faint)]">
               {uploadsAnalisados.length}{" "}
               {uploadsAnalisados.length === 1
-                ? "arquivo analisado disponivel"
-                : "arquivos analisados disponiveis"}
+                ? "arquivo analisado disponível"
+                : "arquivos analisados disponíveis"}
             </p>
           </section>
         )
       ) : (
         <>
-          <ChapterHeader label="Detalhes" title="Principal ponto de atencao do arquivo" />
+          <ChapterHeader label="Detalhes" title="Principal ponto de atenção do arquivo" />
           <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
             <article className="insight-card p-5">
               <div className="flex items-start justify-between gap-3">
                 <p className="invest-eyebrow">Principal alerta do arquivo</p>
-                <InfoHint text="E o ponto mais importante do arquivo selecionado, usando a leitura ja salva. Pode vir da lista de alertas ou do resumo principal." />
+                <InfoHint text="É o ponto mais importante do arquivo selecionado, usando a leitura já salva. Pode vir da lista de alertas ou do resumo principal." />
               </div>
               <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_210px]">
                 <div>
@@ -801,7 +807,7 @@ export default function DashboardPage() {
                     {primarySubheadline}
                   </p>
                   <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm leading-6 text-orange-950">
-                    <p className="font-black">Por que merece atencao</p>
+                    <p className="font-black">Por que merece atenção</p>
                     <p className="mt-1">{primaryConcern}</p>
                     {nextQuestion && (
                       <p className="mt-3 font-black">
@@ -956,7 +962,7 @@ export default function DashboardPage() {
           </section>
 
           <ChapterHeader label="Tabelas" title="Agrupamentos e maiores linhas" />
-          <ChapterHeader label="Alertas" title="Pontos de atencao e tipo de documento" />
+          <ChapterHeader label="Alertas" title="Pontos de atenção e tipo de documento" />
           <section className="grid grid-cols-1 gap-4 xl:grid-cols-[0.85fr_1.15fr]">
             <div className="overflow-hidden rounded-lg border border-[var(--invest-border)] bg-white shadow-[var(--invest-shadow-soft)]">
               <div className="border-b border-[var(--invest-border)] p-5">
@@ -1074,7 +1080,7 @@ export default function DashboardPage() {
                 <SectionTitle
                   eyebrow="Alertas"
                   title="Sinais deste arquivo"
-                  help="Lista os alertas ligados ao arquivo selecionado. Se ainda nao houver alerta salvo, o painel pode mostrar o principal ponto de atencao como apoio visual."
+                  help="Lista os alertas ligados ao arquivo selecionado. Se ainda não houver alerta salvo, o painel pode mostrar o principal ponto de atenção como apoio visual."
                 />
               </div>
               <div className="divide-y divide-[var(--invest-border)]">
