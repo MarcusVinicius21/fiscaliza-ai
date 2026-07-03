@@ -494,6 +494,18 @@ export default function UploadsPage() {
                         {up.analysis_status === "error" && (
                           <StatusPill tone="danger">Erro na análise</StatusPill>
                         )}
+                        <a
+                          href={`/uploads/${up.id}/diagnostico`}
+                          className="invest-button-secondary px-3 py-1 text-xs"
+                        >
+                          Diagnóstico
+                        </a>
+                        <a
+                          href={`/relatorios/upload/${up.id}`}
+                          className="invest-button-secondary px-3 py-1 text-xs"
+                        >
+                          Dossiê
+                        </a>
                       </div>
                     </td>
                   </tr>

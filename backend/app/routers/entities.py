@@ -628,6 +628,59 @@ def search_entities(
         _raise_upstream_http_error(error, "Falha temporária ao buscar entidades. Tente novamente.")
 
 
+@router.get("/suppliers")
+def suppliers_directory(limit: int = Query(12, ge=1, le=50)):
+    try:
+        response = _execute_with_retry(
+            lambda: supabase.table("entities")
+            .select("id, entity_type, canonical_name, document, source_confidence, created_at")
+            .in_("entity_type", list(SUPPLIER_TYPES))
+            .limit(200),
+            "entities",
+        )
+        rows = response.data or []
+        supplier_ids = [str(row["id"]) for row in rows]
+        stats_map = _entity_stats(supplier_ids)
+        rows_by_id = {str(row["id"]): row for row in rows}
+
+        ordered_ids = sorted(
+            supplier_ids,
+            key=lambda entity_id: (
+                stats_map.get(entity_id, {}).get("total_amount", 0),
+                stats_map.get(entity_id, {}).get("records_count", 0),
+            ),
+            reverse=True,
+        )
+
+        items = []
+        for entity_id in ordered_ids[:limit]:
+            entity = rows_by_id.get(entity_id, {})
+            stats = stats_map.get(entity_id, {})
+            try:
+                alerts_count = len(_build_supplier_alerts_bundle(entity_id)["related_alerts"])
+            except Exception:
+                alerts_count = 0
+
+            items.append({
+                "id": entity_id,
+                "entity_type": entity.get("entity_type"),
+                "canonical_name": entity.get("canonical_name"),
+                "document": entity.get("document"),
+                "uploads_count": stats.get("uploads_count", 0),
+                "records_count": stats.get("records_count", 0),
+                "total_amount": stats.get("total_amount", 0.0),
+                "alerts_count": alerts_count,
+            })
+
+        return {
+            "status": "ok",
+            "suppliers": items,
+            "count": len(items),
+        }
+    except UpstreamQueryError as error:
+        _raise_upstream_http_error(error, "Falha temporária ao carregar fornecedores. Tente novamente.")
+
+
 @router.get("/suppliers/{entity_id}")
 def supplier_overview(entity_id: str):
     try:

@@ -5,6 +5,13 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { SkeletonBlock } from "@/components/app/skeleton-block";
 import { StatusPill } from "@/components/app/status-pill";
+import {
+  AttentionPointCard,
+  FactLinkStatusSummary,
+  EmptyStateWithReason,
+} from "@/components/product/investigative-product";
+import { parseMoney } from "@/lib/product-diagnostics";
+import { supabase } from "@/lib/supabase";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 
@@ -92,6 +99,23 @@ interface SupplierRecordsPayload {
   items: SupplierRecord[];
 }
 
+interface SupplierSpendFacts {
+  contracts: Array<{
+    id: string;
+    contract_number_raw?: string | null;
+    contract_value?: number | null;
+    bid_link_status?: string | null;
+    object_text?: string | null;
+  }>;
+  payments: Array<{
+    id: string;
+    payment_number_raw?: string | null;
+    payment_value?: number | null;
+    contract_link_status?: string | null;
+    payment_date?: string | null;
+  }>;
+}
+
 function formatMoney(value: number) {
   return value.toLocaleString("pt-BR", {
     style: "currency",
@@ -108,6 +132,16 @@ function formatDocument(value?: string | null) {
     return digits.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
   }
   return value || "Sem documento";
+}
+
+function isContractRecord(record: SupplierRecord) {
+  return String(record.category || "").toLowerCase() === "contracts";
+}
+
+function isPaymentRecord(record: SupplierRecord) {
+  const category = String(record.category || "").toLowerCase();
+  const reportType = String(record.report_type || "").toLowerCase();
+  return category === "expenses" || reportType === "pagamentos" || reportType === "pagamento";
 }
 
 function safeDetail(payload: unknown, fallback: string) {
@@ -149,6 +183,8 @@ export default function SupplierDetailPage() {
   const [recordsPage, setRecordsPage] = useState(1);
   const [selectedUpload, setSelectedUpload] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [spendFacts, setSpendFacts] = useState<SupplierSpendFacts>({ contracts: [], payments: [] });
+  const [spendFactsError, setSpendFactsError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -249,6 +285,42 @@ export default function SupplierDetailPage() {
     setRecordsPage(1);
   }, [selectedUpload, selectedCategory]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSpendFacts() {
+      if (!supplierId) return;
+      setSpendFactsError("");
+      const [contractsRes, paymentsRes] = await Promise.all([
+        supabase
+          .from("contracts_facts")
+          .select("id, contract_number_raw, contract_value, bid_link_status, object_text")
+          .eq("supplier_entity_id", supplierId)
+          .limit(100),
+        supabase
+          .from("payments_facts")
+          .select("id, payment_number_raw, payment_value, contract_link_status, payment_date")
+          .eq("supplier_entity_id", supplierId)
+          .limit(100),
+      ]);
+
+      if (cancelled) return;
+      if (contractsRes.error || paymentsRes.error) {
+        setSpendFactsError("Não foi possível carregar a cadeia factual deste fornecedor agora.");
+        return;
+      }
+      setSpendFacts({
+        contracts: (contractsRes.data || []) as SupplierSpendFacts["contracts"],
+        payments: (paymentsRes.data || []) as SupplierSpendFacts["payments"],
+      });
+    }
+
+    loadSpendFacts();
+    return () => {
+      cancelled = true;
+    };
+  }, [supplierId]);
+
   const maxTimelineAmount = useMemo(() => {
     return Math.max(...(overview?.timeline || []).map((item) => item.total_amount), 0);
   }, [overview]);
@@ -283,6 +355,20 @@ export default function SupplierDetailPage() {
   }
 
   const alertItems = overview.related_alerts || [];
+  const records = recordsPayload?.items || [];
+  const contractRecords = records.filter(isContractRecord);
+  const paymentRecords = records.filter(isPaymentRecord);
+  const contractCategory = overview.categories.find((item) => String(item.category || "").toLowerCase() === "contracts");
+  const totalContracted = spendFacts.contracts.length > 0
+    ? spendFacts.contracts.reduce((sum, item) => sum + parseMoney(item.contract_value || 0), 0)
+    : contractRecords.reduce((sum, item) => sum + parseMoney(item.valor_bruto || 0), 0) || parseMoney(contractCategory?.total_amount || 0);
+  const totalReceived = spendFacts.payments.length > 0
+    ? spendFacts.payments.reduce((sum, item) => sum + parseMoney(item.payment_value || 0), 0)
+    : paymentRecords.reduce((sum, item) => sum + parseMoney(item.valor_bruto || 0), 0);
+  const contractVisualCount = spendFacts.contracts.length || contractRecords.length || Number(contractCategory?.records_count || 0);
+  const paymentVisualCount = spendFacts.payments.length || paymentRecords.length;
+  const contractsWithoutBid = spendFacts.contracts.filter((item) => (item.bid_link_status || "unlinked") === "unlinked").length;
+  const paymentsWithoutContract = spendFacts.payments.filter((item) => (item.contract_link_status || "unlinked") === "unlinked").length;
 
   return (
     <div className="page-shell">
@@ -310,6 +396,9 @@ export default function SupplierDetailPage() {
           <Link href="/search" className="invest-button-secondary px-4">
             Voltar para busca
           </Link>
+          <Link href={`/relatorios/fornecedor/${supplierId}`} className="invest-button px-4">
+            Abrir dossiê
+          </Link>
         </div>
 
         {overview.supplier.aliases.length > 0 ? (
@@ -321,6 +410,172 @@ export default function SupplierDetailPage() {
             ))}
           </div>
         ) : null}
+      </section>
+
+      <section className="invest-card p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="invest-section-title">Fornecedor 360</p>
+            <p className="mt-1 text-sm text-[var(--invest-muted)]">
+              Leitura por facts materializados e registros relacionados, sem alterar a cadeia factual.
+            </p>
+          </div>
+          <StatusPill tone={paymentsWithoutContract || contractsWithoutBid ? "warning" : "success"}>
+            {paymentsWithoutContract || contractsWithoutBid ? "requer análise humana" : "vínculos presentes"}
+          </StatusPill>
+        </div>
+
+        {spendFactsError ? (
+          <p className="mt-4 text-sm font-bold text-[var(--invest-danger)]">{spendFactsError}</p>
+        ) : (
+          <>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <article className="metric-card">
+                <p className="metric-label">Total contratado</p>
+                <p className="metric-value mt-2">{formatMoney(totalContracted)}</p>
+              </article>
+              <article className="metric-card">
+                <p className="metric-label">Total pago</p>
+                <p className="metric-value mt-2">{formatMoney(totalReceived)}</p>
+              </article>
+              <article className="metric-card">
+                <p className="metric-label">Contratos / pagamentos</p>
+                <p className="metric-value mt-2">{contractVisualCount} / {paymentVisualCount}</p>
+                <p className="mt-1 text-xs text-[var(--invest-muted)]">registros factuais ou relacionados</p>
+              </article>
+            </div>
+
+            {paymentsWithoutContract || contractsWithoutBid || spendFacts.contracts.length === 0 ? (
+              <div className="mt-5">
+                <AttentionPointCard
+                  title="Ausência de vínculo factual explicada"
+                  body="Quando não há fact real ou vínculo automático, a tela exibe registros relacionados como apoio visual. Isso não afirma vínculo factual com pagamento."
+                  tone="info"
+                />
+              </div>
+            ) : null}
+          </>
+        )}
+      </section>
+
+      <FactLinkStatusSummary
+        contracts={{ total: contractVisualCount, unlinked: spendFacts.contracts.length ? contractsWithoutBid : contractVisualCount }}
+        payments={{ total: paymentVisualCount, unlinked: spendFacts.payments.length ? paymentsWithoutContract : paymentVisualCount }}
+        bids={{ total: 0, unlinked: 0 }}
+      />
+
+      <section className="grid gap-5 xl:grid-cols-2">
+        <article className="invest-card p-5 sm:p-6">
+          <p className="invest-section-title">Contratos / registros contratuais</p>
+          <div className="mt-4 space-y-3">
+            {spendFacts.contracts.length > 0 ? (
+              spendFacts.contracts.slice(0, 8).map((contract) => (
+                <div key={contract.id} className="invest-card-solid p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-mono text-sm text-[var(--invest-heading)]">
+                        {contract.contract_number_raw || contract.id.slice(0, 8)}
+                      </p>
+                      <p className="mt-1 line-clamp-2 text-xs text-[var(--invest-muted)]">
+                        {contract.object_text || "objeto não informado"}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-black text-[var(--invest-heading)]">
+                        {formatMoney(parseMoney(contract.contract_value || 0))}
+                      </p>
+                      <StatusPill tone={(contract.bid_link_status || "unlinked") === "unlinked" ? "warning" : "success"}>
+                        {(contract.bid_link_status || "unlinked") === "unlinked" ? "sem licitação" : "vinculado"}
+                      </StatusPill>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : contractRecords.length > 0 ? (
+              contractRecords.slice(0, 8).map((record) => (
+                <div key={record.record_id} className="invest-card-solid p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-mono text-sm text-[var(--invest-heading)]">
+                        {record.document || record.record_id.slice(0, 8)}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--invest-muted)]">
+                        Registro contratual encontrado na base carregada.
+                      </p>
+                      <p className="mt-1 line-clamp-2 text-xs text-[var(--invest-muted)]">
+                        {record.summary || "resumo não informado"}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-black text-[var(--invest-heading)]">
+                        {formatMoney(parseMoney(record.valor_bruto || 0))}
+                      </p>
+                      <StatusPill tone="warning">sem vínculo factual com pagamento</StatusPill>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <EmptyStateWithReason reason="Nenhum contrato factual ou registro contratual foi associado a este fornecedor no acervo atual." />
+            )}
+          </div>
+        </article>
+
+        <article className="invest-card p-5 sm:p-6">
+          <p className="invest-section-title">Pagamentos / registros financeiros</p>
+          <div className="mt-4 space-y-3">
+            {spendFacts.payments.length > 0 ? (
+              spendFacts.payments.slice(0, 8).map((payment) => (
+                <div key={payment.id} className="invest-card-solid p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-mono text-sm text-[var(--invest-heading)]">
+                        {payment.payment_number_raw || payment.id.slice(0, 8)}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--invest-muted)]">
+                        {payment.payment_date || "data não informada"}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-black text-[var(--invest-heading)]">
+                        {formatMoney(parseMoney(payment.payment_value || 0))}
+                      </p>
+                      <StatusPill tone={(payment.contract_link_status || "unlinked") === "unlinked" ? "warning" : "success"}>
+                        {(payment.contract_link_status || "unlinked") === "unlinked" ? "sem contrato" : "vinculado"}
+                      </StatusPill>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : paymentRecords.length > 0 ? (
+              paymentRecords.slice(0, 8).map((record) => (
+                <div key={record.record_id} className="invest-card-solid p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-mono text-sm text-[var(--invest-heading)]">
+                        {record.document || record.record_id.slice(0, 8)}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--invest-muted)]">
+                        Registro financeiro encontrado na base carregada.
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--invest-muted)]">
+                        {record.data || "data não informada"}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-black text-[var(--invest-heading)]">
+                        {formatMoney(parseMoney(record.valor_bruto || 0))}
+                      </p>
+                      <StatusPill tone="warning">sem pagamento vinculado automaticamente</StatusPill>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <EmptyStateWithReason reason="Nenhum pagamento factual ou registro financeiro foi associado a este fornecedor no acervo atual." />
+            )}
+          </div>
+        </article>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
